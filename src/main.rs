@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     chat_message.push_str(stdout_str.as_ref());
 
     let req = ChatCompletionRequest::new(
-        GPT4_O_MINI.to_string(),//TODO: Pull this out to be a parameter
+        GPT4_O_MINI.to_string(),
         vec![chat_completion::ChatCompletionMessage {
             role: chat_completion::MessageRole::user,
             content: chat_completion::Content::Text(chat_message),

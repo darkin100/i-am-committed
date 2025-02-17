@@ -14,14 +14,12 @@ impl CommitFormatter {
         let type_str = self.determine_type();
         let scope = self.extract_scope();
         let description = self.format_description();
-        let body = self.extract_body();
         let breaking_change = self.is_breaking_change();
 
         CommitType::new(
             type_str.to_string(),
             scope,
             description,
-            body,
             breaking_change,
         )
     }

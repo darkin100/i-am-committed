@@ -8,7 +8,6 @@ pub struct CommitType {
     pub type_str: String,
     pub scope: Option<String>,
     pub description: String,
-    pub body: Option<String>,
     pub breaking_change: bool,
 }
 
@@ -17,14 +16,12 @@ impl CommitType {
         type_str: String,
         scope: Option<String>,
         description: String,
-        body: Option<String>,
         breaking_change: bool,
     ) -> Self {
         CommitType {
             type_str,
             scope,
             description,
-            body,
             breaking_change,
         }
     }
@@ -41,12 +38,6 @@ impl CommitType {
         // Add description
         result.push_str(": ");
         result.push_str(&self.description);
-        
-        // Add body if present
-        if let Some(body) = &self.body {
-            result.push_str("\n\n");
-            result.push_str(body);
-        }
         
         // Add breaking change footer if needed
         if self.breaking_change {
