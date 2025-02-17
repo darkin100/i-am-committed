@@ -48,9 +48,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
         "Generate a commit message following the Conventional Commits specification. \
         Use one of these types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert. \
         Include a scope in parentheses if relevant. \
-        If this is a breaking change, include BREAKING CHANGE: in the footer. \
         Example format: \
-        type(scope): description\n\n[optional body]\n\n[optional footer]\n\n\
+        type(scope): description\n\n[optional body]
         Here are the changes to commit:"
     );
     chat_message.push_str(stdout_str.as_ref());
