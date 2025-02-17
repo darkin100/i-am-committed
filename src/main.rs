@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::io::{stdout, Write};
+use std::io::Write;
 use std::process::Command;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
