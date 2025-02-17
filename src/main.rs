@@ -27,7 +27,9 @@ struct Cli {
 async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     
     //TODO: Pull this out to be a parameter/environment variable
-    let api_key = env::var("OPENAI_API_KEY").unwrap().to_string();
+    let api_key = env::var("OPENAI_API_KEY")
+        .map_err(|_| "Error: OPENAI_API_KEY environment variable is not set. Please set this environment variable with your OpenAI API key to use this application.")?
+        .to_string();
     
     //Get the git diff message
     let mut git = Command::new("git");
