@@ -7,6 +7,9 @@ use openai_api_rs::v1::common::GPT4_O_MINI;
 use std::{env, io};
 extern crate termion;
 
+mod commit_formatter;
+use commit_formatter::CommitFormatter;
+
 
 #[derive(Parser)]
 #[command(name = "iamcommitted")]
@@ -34,9 +37,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     if output.stdout.is_empty(){
         println!("No changes to commit");
         return Ok(());
-    }else{
-        //DEBUG Print
-        println!("DEBUG:{:?}", &output.stdout);
     }
 
     // Convert stdout bytes to a String
@@ -44,7 +44,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     
     let client = OpenAIClient::builder().with_api_key(api_key).build()?;
 
-    let mut chat_message = String::from("Please provide a commit message for these changes:");
+    let mut chat_message = String::from(
+        "Generate a commit message following the Conventional Commits specification. \
+        Use one of these types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert. \
+        Include a scope in parentheses if relevant. \
+        If this is a breaking change, include BREAKING CHANGE: in the footer. \
+        Example format: \
+        type(scope): description\n\n[optional body]\n\n[optional footer]\n\n\
+        Here are the changes to commit:"
+    );
     chat_message.push_str(stdout_str.as_ref());
 
     let req = ChatCompletionRequest::new(
@@ -61,8 +69,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     let result = client.chat_completion(req).await?;
     
     let content = result.choices[0].message.content.clone();
-    let commit_message = content.unwrap();
-    println!("{}", commit_message );
+    let raw_message = content.unwrap();
+    
+    // Format the commit message using our CommitFormatter
+    let formatter = CommitFormatter::new(raw_message);
+    let formatted_commit = formatter.format();
+    let commit_message = formatted_commit.to_string();
+    
+    println!("Generated Conventional Commit:");
+    println!("{}", commit_message);
     println!("Please select an option:");
     println!("1. Commit Changes with message");
     // println!("2. Edit message");
