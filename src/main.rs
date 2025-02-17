@@ -76,15 +76,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     let formatted_commit = formatter.format();
     let commit_message = formatted_commit.to_string();
     
-    println!("Generated Conventional Commit:");
+    println!("\nGenerated Conventional Commit:");
     println!("{}", commit_message);
-    println!("Please select an option:");
-    println!("1. Commit Changes with message");
-    // println!("2. Edit message");
+    println!("\nPlease select an option:");
+    println!("1. Commit changes with this message");
     println!("2. Cancel");    
 
-    // Read user input
-    print!("Enter your choice (1-3): ");
+    print!("\nEnter your choice (1-2): ");
     io::stdout().flush().unwrap(); // Ensure the prompt is displayed before reading input
     
     let mut input = String::new();
@@ -96,55 +94,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
       let num_result=  input.trim().parse::<u32>();
     
     if num_result.is_err() {
-        println!("Please enter a valid number between 1 and 3");
+        println!("Please enter a valid number (1 or 2)");
         return Ok(());
-    
-    }else{
+    } else {
         let num = num_result.unwrap();
         
-        if num == 1{
-        
-            println!("Committing message to Git");
-            let output = git
+        if num == 1 {
+            println!("\nCommitting changes to Git...");
+            // Create a new git command for committing
+            let output = Command::new("git")
                         .arg("commit")
                         .arg("-m")
-                        .arg(commit_message)
+                        .arg(&commit_message)
                         .output()
                         .expect("process failed to execute");
 
-            // Check if stdout has any content
-            if output.stdout.is_empty() {
-                println!("No output in stdout");
-            } else {
-                println!("Stdout contains {} bytes", output.stdout.len());
-                // Convert and print the output
+            // Print both stdout and stderr
+            if !output.stdout.is_empty() {
                 match String::from_utf8(output.stdout) {
-                    Ok(stdout_str) => println!("Output: {}", stdout_str),
+                    Ok(stdout_str) => println!("{}", stdout_str.trim()),
                     Err(_) => println!("Output contains non-UTF8 characters"),
                 }
             }
-
-            // Also check the status
-            println!("Exit status: {}", output.status);
-
-
-        }else if num == 2{
             
-            println!("Commit cancelled");
-            return Ok(());
+            if !output.stderr.is_empty() {
+                match String::from_utf8(output.stderr) {
+                    Ok(stderr_str) => println!("{}", stderr_str.trim()),
+                    Err(_) => println!("Error output contains non-UTF8 characters"),
+                }
+            }
 
-            // println!("{}", commit_message);
-            // println!("\r");
-            // let mut input = String::new();
-            // io::stdin()
-            //     .read_line(&mut input)
-            //     .expect("Failed to read line");
+            if output.status.success() {
+                println!("Successfully committed changes!");
+            } else {
+                println!("Failed to commit changes. Exit status: {}", output.status);
+            }
 
-            // println!("{0}",input.trim());
 
-            
-        }else{
-            println!("Commit cancelled");
+        } else {
+            println!("\nCommit cancelled");
             return Ok(());
         }
     }
