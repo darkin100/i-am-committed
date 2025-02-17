@@ -123,9 +123,38 @@ impl CommitFormatter {
         // Split message into lines and look for detailed explanations
         let lines: Vec<&str> = self.raw_message.split('\n').collect();
         if lines.len() > 1 {
-            let body = lines[1..].join("\n").trim().to_string();
-            if !body.is_empty() {
-                return Some(body);
+            let body_lines: Vec<&str> = lines[1..].iter()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            if !body_lines.is_empty() {
+                // Remove duplicate paragraphs
+                let mut unique_paragraphs: Vec<String> = Vec::new();
+                let mut current_paragraph = String::new();
+
+                for line in body_lines {
+                    if line.is_empty() && !current_paragraph.is_empty() {
+                        if !unique_paragraphs.contains(&current_paragraph) {
+                            unique_paragraphs.push(current_paragraph.clone());
+                        }
+                        current_paragraph.clear();
+                    } else if !line.is_empty() {
+                        if !current_paragraph.is_empty() {
+                            current_paragraph.push(' ');
+                        }
+                        current_paragraph.push_str(line);
+                    }
+                }
+
+                // Add the last paragraph if it's not empty
+                if !current_paragraph.is_empty() && !unique_paragraphs.contains(&current_paragraph) {
+                    unique_paragraphs.push(current_paragraph);
+                }
+
+                if !unique_paragraphs.is_empty() {
+                    return Some(unique_paragraphs.join("\n\n"));
+                }
             }
         }
         None
