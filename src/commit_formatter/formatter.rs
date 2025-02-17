@@ -14,23 +14,16 @@ impl CommitFormatter {
         let type_str = self.determine_type();
         let scope = self.extract_scope();
         let description = self.format_description();
-        let breaking_change = self.is_breaking_change();
 
         CommitType::new(
             type_str.to_string(),
             scope,
             description,
-            breaking_change,
         )
     }
 
     fn determine_type(&self) -> &'static str {
         let lower_message = self.raw_message.to_lowercase();
-        
-        // First, check for breaking changes as they often indicate features
-        if self.is_breaking_change() {
-            return "feat";
-        }
 
         // Check for common patterns indicating different types
         for &commit_type in COMMIT_TYPES {
@@ -117,60 +110,6 @@ impl CommitFormatter {
         description
     }
 
-    fn extract_body(&self) -> Option<String> {
-        // Split message into lines and look for detailed explanations
-        let lines: Vec<&str> = self.raw_message.split('\n').collect();
-        if lines.len() > 1 {
-            let body_lines: Vec<&str> = lines[1..].iter()
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .collect();
-
-            if !body_lines.is_empty() {
-                // Remove duplicate paragraphs
-                let mut unique_paragraphs: Vec<String> = Vec::new();
-                let mut current_paragraph = String::new();
-
-                for line in body_lines {
-                    if line.is_empty() && !current_paragraph.is_empty() {
-                        if !unique_paragraphs.contains(&current_paragraph) {
-                            unique_paragraphs.push(current_paragraph.clone());
-                        }
-                        current_paragraph.clear();
-                    } else if !line.is_empty() {
-                        if !current_paragraph.is_empty() {
-                            current_paragraph.push(' ');
-                        }
-                        current_paragraph.push_str(line);
-                    }
-                }
-
-                // Add the last paragraph if it's not empty
-                if !current_paragraph.is_empty() && !unique_paragraphs.contains(&current_paragraph) {
-                    unique_paragraphs.push(current_paragraph);
-                }
-
-                if !unique_paragraphs.is_empty() {
-                    return Some(unique_paragraphs.join("\n\n"));
-                }
-            }
-        }
-        None
-    }
-
-    fn is_breaking_change(&self) -> bool {
-        let lower_message = self.raw_message.to_lowercase();
-        let breaking_patterns = [
-            "breaking change",
-            "breaking-change",
-            "major version",
-            "incompatible",
-            "backwards-incompatible",
-            "breaking update",
-        ];
-
-        breaking_patterns.iter().any(|&pattern| lower_message.contains(pattern))
-    }
 }
 
 #[cfg(test)]
@@ -197,17 +136,6 @@ mod tests {
             let formatter = CommitFormatter::new(message.to_string());
             assert_eq!(formatter.determine_type(), expected_type);
         }
-    }
-
-    #[test]
-    fn test_breaking_change_detection() {
-        let formatter = CommitFormatter::new(
-            "Add new API endpoint BREAKING CHANGE: This changes the API format".to_string(),
-        );
-        assert!(formatter.is_breaking_change());
-
-        let formatter = CommitFormatter::new("Simple update".to_string());
-        assert!(!formatter.is_breaking_change());
     }
 
     #[test]

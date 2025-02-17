@@ -8,7 +8,6 @@ pub struct CommitType {
     pub type_str: String,
     pub scope: Option<String>,
     pub description: String,
-    pub breaking_change: bool,
 }
 
 impl CommitType {
@@ -16,13 +15,11 @@ impl CommitType {
         type_str: String,
         scope: Option<String>,
         description: String,
-        breaking_change: bool,
     ) -> Self {
         CommitType {
             type_str,
             scope,
             description,
-            breaking_change,
         }
     }
 
@@ -38,11 +35,6 @@ impl CommitType {
         // Add description
         result.push_str(": ");
         result.push_str(&self.description);
-        
-        // Add breaking change footer if needed
-        if self.breaking_change {
-            result.push_str("\n\nBREAKING CHANGE: This commit introduces breaking changes");
-        }
         
         result
     }
