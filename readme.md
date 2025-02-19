@@ -30,7 +30,7 @@ To build and install the command line tool, use the following command:
 
     cargo install --path .
 
-### Running the Application
+### Running the Application from command line
 
 The CLI currently uses OpenAIs API. So you will need to get your [own API key](https://platform.openai.com/) and set it as an environment variable, or as part of your vscode launch.json
 
@@ -52,6 +52,12 @@ This should generate a commit message following the conventional commits standar
     2. Cancel
 
     Enter your choice (1-2):
+
+### Documentation
+
+For further documentation please refer to
+
+    [/docs/launch.md]
 
 ### References
 
