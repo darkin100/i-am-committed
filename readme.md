@@ -57,7 +57,7 @@ This should generate a commit message following the conventional commits standar
 
 For further documentation please refer to
 
-    [/docs/launch.md]
+[/docs/launch.md](/docs/launch.md)
 
 ### References
 
