@@ -57,8 +57,8 @@ This should generate a commit message following the conventional commits standar
 
 Conventional commits
 
-https://www.conventionalcommits.org/en/v1.0.0/#
+<https://www.conventionalcommits.org/en/v1.0.0/#>
 
 Inspiration comes from the great work that done by
 
-https://github.com/Nutlope/aicommits
+<https://github.com/Nutlope/aicommits>
