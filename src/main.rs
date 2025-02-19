@@ -18,7 +18,7 @@ use commit_formatter::CommitFormatter;
 #[command(about = "A command line application", long_about = None)]
 struct Cli {
     
-    //Adding in a comment to test the commit message generation
+    
 
     
 }
