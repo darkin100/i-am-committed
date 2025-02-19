@@ -1,5 +1,7 @@
 # I Am Committed
 
+## An AI micro bot for generating Git Commits
+
 This project is an experimentation into AI. Specifically I am looking to understand AI tools better to answer 2 questions.
 
 1. Are AI Coding tools any good and do they make me more productive?
