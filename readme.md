@@ -55,7 +55,7 @@ This should generate a commit message following the conventional commits standar
 
 ### Documentation
 
-For further to the [docs](/docs/) for more information
+Please refer to the [docs](/docs/) for further information
 
 ### References
 
