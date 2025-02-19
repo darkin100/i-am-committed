@@ -32,6 +32,10 @@ To build and install the command line tool, use the following command:
 
 ### Running the Application
 
+The CLI currently uses OpenAIs API. So you will need to get your [own API key](https://platform.openai.com/) and set it as an environment variable, or as part of your vscode launch.json
+
+    export OPENAI_API_KEY=<key>
+
 To execute the command, its as simple as:
 
     git add .
