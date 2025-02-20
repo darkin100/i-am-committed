@@ -27,7 +27,13 @@ struct Cli {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     
-    println!("{}", "I am committed!".green());
+    println!("{}", r#"
+    ____               _____                 _ __  __         __
+    /  _/ ___ ___ _    / ___/__  __ _  __ _  (_) /_/ /____ ___/ /
+   _/ /  / _ `/  ' \  / /__/ _ \/  ' \/  ' \/ / __/ __/ -_) _  / 
+  /___/  \_,_/_/_/_/  \___/\___/_/_/_/_/_/_/_/\__/\__/\__/\_,_/  
+                                                                 
+      "#.green());
 
     let api_key = env::var("OPENAI_API_KEY")
         .map_err(|_| "Error: OPENAI_API_KEY environment variable is not set. Please set this environment variable with your OpenAI API key to use this application.")?
