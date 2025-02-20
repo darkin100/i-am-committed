@@ -6,6 +6,7 @@ use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
 use openai_api_rs::v1::common::GPT4_O_MINI;
 use std::{env, io};
 extern crate termion;
+use colored::Colorize;
 
 mod commit_formatter;
 use commit_formatter::CommitFormatter;
@@ -26,6 +27,8 @@ struct Cli {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     
+    println!("{}", "I am committed!".green());
+
     let api_key = env::var("OPENAI_API_KEY")
         .map_err(|_| "Error: OPENAI_API_KEY environment variable is not set. Please set this environment variable with your OpenAI API key to use this application.")?
         .to_string();
@@ -35,7 +38,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     let output = git.arg("diff").arg("--cached").arg("--diff-algorithm=minimal").output().expect("process failed to execute");
     
     if output.stdout.is_empty(){
-        println!("No changes to commit");
+        println!("\n{} staged changes found.","No".red());
+        println!("  Please stage your changes using 'git add' before running this command.\n");
         return Ok(());
     }
 
@@ -124,14 +128,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
             }
 
             if output.status.success() {
-                println!("Successfully committed changes!");
+                println!("{} Successfully committed changes!","✔".green());
             } else {
-                println!("Failed to commit changes. Exit status: {}", output.status);
+                println!("{} {}","Failed to commit changes. Exit status:".red(), output.status);
             }
 
 
         } else {
-            println!("\nCommit cancelled");
+            println!("\nCommit cancelled\n");
             return Ok(());
         }
     }
