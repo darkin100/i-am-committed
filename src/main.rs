@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     let output = git.arg("diff").arg("--cached").arg("--diff-algorithm=minimal").output().expect("process failed to execute");
     
     if output.stdout.is_empty(){
-        println!("\n{} staged changes found.","No".red());
+        println!("\n{} No staged changes found.","!".yellow());
         println!("  Please stage your changes using 'git add' before running this command.\n");
         return Ok(());
     }
