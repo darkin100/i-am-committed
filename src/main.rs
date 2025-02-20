@@ -49,6 +49,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
         return Ok(());
     }
 
+    println!("\nGenerated Conventional Commit ...");
+
     // Convert stdout bytes to a String
     let stdout_str = String::from_utf8_lossy(&output.stdout);
     
@@ -85,8 +87,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     let formatted_commit = formatter.format();
     let commit_message = formatted_commit.to_string();
     
-    println!("\nGenerated Conventional Commit:");
-    println!("{}", commit_message);
+    println!("\n{}", commit_message.color("grey"));
     println!("\nPlease select an option:");
     println!("1. Commit changes with this message");
     println!("2. Cancel");    
@@ -103,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
       let num_result=  input.trim().parse::<u32>();
     
     if num_result.is_err() {
-        println!("Please enter a valid number (1 or 2)");
+        println!("\n{} Please enter a valid number (1-2)\n","❌".red());
         return Ok(());
     } else {
         let num = num_result.unwrap();
@@ -134,7 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
             }
 
             if output.status.success() {
-                println!("{} Successfully committed changes!","✔".green());
+                println!("\n{} You are successfully committed!\n","✔".green());
             } else {
                 println!("{} {}","Failed to commit changes. Exit status:".red(), output.status);
             }
