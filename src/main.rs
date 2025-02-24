@@ -49,9 +49,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
         return Ok(());
     }
 
-    // Print the git diff output
-    println!("\nStaged changes:");
-    println!("{}", String::from_utf8_lossy(&output.stdout));
+    // Get list of staged files
+    let files_output = Command::new("git")
+        .arg("diff")
+        .arg("--cached")
+        .arg("--name-only")
+        .output()
+        .expect("process failed to execute");
+
+    // Print the staged files
+    println!("\nStaged files:");
+    println!("{}", String::from_utf8_lossy(&files_output.stdout));
 
     println!("\nGenerated Conventional Commit ...");
 
