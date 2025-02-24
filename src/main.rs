@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>  {
     
     if output.stdout.is_empty(){
         println!("\n{} No staged changes found.","!".yellow());
-        println!("  Please stage your changes using 'git add' before running this command.\n");
+        println!("\n  Please stage your changes using 'git add' before running this command.\n");
         return Ok(());
     }
 
