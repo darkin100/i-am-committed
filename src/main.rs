@@ -118,79 +118,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             commit_changes(&git_client, &commit_message)?;
         }
         2 => {
-            // Edit commit message
-            use termion::input::{TermRead, MouseTerminal};
-            use termion::raw::{IntoRawMode, RawTerminal};
-            use termion::event::Key;
+            // Edit commit message using nano
+            use std::fs;
+            use std::process::Command;
+            use tempfile::NamedTempFile;
             
-            println!("\nEdit commit message (press Enter when done):");
+            // Create a temporary file with the commit message
+            let mut temp_file = NamedTempFile::new()?;
+            write!(temp_file, "{}", commit_message)?;
+            temp_file.flush()?;
             
-            // Set up raw mode
-            let stdin = io::stdin();
-            let mut stdout: RawTerminal<io::Stdout> = io::stdout().into_raw_mode()?;
-            
-            // Initialize with the generated message
-            let mut edited_message = commit_message.chars().collect::<Vec<char>>();
-            let mut cursor_pos = edited_message.len();
-            
-            // Print initial message
-            write!(stdout, "{}", commit_message)?;
-            stdout.flush()?;
-            
-            for evt in stdin.events() {
-                match evt? {
-                    Key::Char('\n') => break,
-                    Key::Char(c) => {
-                        edited_message.insert(cursor_pos, c);
-                        cursor_pos += 1;
-                        
-                        // Redraw from cursor position
-                        write!(stdout, "{}", termion::clear::UntilNewline)?;
-                        for ch in &edited_message[cursor_pos-1..] {
-                            write!(stdout, "{}", ch)?;
-                        }
-                        
-                        // Move cursor back to insertion point
-                        if cursor_pos < edited_message.len() {
-                            write!(stdout, "{}", termion::cursor::Left((edited_message.len() - cursor_pos) as u16))?;
-                        }
-                    },
-                    Key::Left => {
-                        if cursor_pos > 0 {
-                            cursor_pos -= 1;
-                            write!(stdout, "{}", termion::cursor::Left(1))?;
-                        }
-                    },
-                    Key::Right => {
-                        if cursor_pos < edited_message.len() {
-                            cursor_pos += 1;
-                            write!(stdout, "{}", termion::cursor::Right(1))?;
-                        }
-                    },
-                    Key::Backspace => {
-                        if cursor_pos > 0 {
-                            edited_message.remove(cursor_pos - 1);
-                            cursor_pos -= 1;
-                            
-                            // Move cursor back and redraw
-                            write!(stdout, "\x08{}", termion::clear::UntilNewline)?;
-                            for ch in &edited_message[cursor_pos..] {
-                                write!(stdout, "{}", ch)?;
-                            }
-                            
-                            // Move cursor back to deletion point
-                            if cursor_pos < edited_message.len() {
-                                write!(stdout, "{}", termion::cursor::Left((edited_message.len() - cursor_pos) as u16))?;
-                            }
-                        }
-                    },
-                    _ => {}
-                }
-                stdout.flush()?;
+            // Open nano to edit the message
+            let status = Command::new("nano")
+                .arg(temp_file.path())
+                .status()
+                .expect("Failed to open nano");
+                
+            if !status.success() {
+                println!("\nFailed to edit commit message");
+                return Ok(());
             }
             
-            // Convert back to string
-            let edited_message = edited_message.iter().collect::<String>();
+            // Read back the edited message
+            let edited_message = fs::read_to_string(temp_file.path())?;
             
             // Format the edited message
             let formatter = CommitFormatter::new(edited_message);
