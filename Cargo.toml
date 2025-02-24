@@ -12,3 +12,6 @@ openai-api-rs = "5.2.6"
 tokio = "1"
 termion = "*"
 regex = "1.10.2"
+
+[dev-dependencies]
+tempfile = "3.8"

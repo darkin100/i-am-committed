@@ -585,6 +585,7 @@ dependencies = [
  "colored",
  "openai-api-rs",
  "regex",
+ "tempfile",
  "termion",
  "tokio",
 ]

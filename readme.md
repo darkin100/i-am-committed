@@ -55,9 +55,11 @@ This should generate a commit message following the conventional commits standar
 
     Enter your choice (1-2):
 
-### Documentation
+## Unit Tests
 
-Please refer to the [docs](/docs/) for further information
+We have used Cline to generate unit tests, you can test them running the cargo command.
+
+    cargo test
 
 ### References
 

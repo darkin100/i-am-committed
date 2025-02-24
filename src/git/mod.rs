@@ -66,9 +66,8 @@ impl GitClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::{self, File};
+    use std::fs::File;
     use std::io::Write;
-    use std::path::PathBuf;
     use tempfile::TempDir;
 
     fn setup_test_repo() -> TempDir {
