@@ -16,7 +16,7 @@ use commit_formatter::CommitFormatter;
 #[command(name = "iamcommitted")]
 #[command(author = "Your Name")]
 #[command(version = "1.0")]
-#[command(about = "A command line application", long_about = None)]
+#[command(about = "A small CLI used for generating Git commit messages", long_about = None)]
 struct Cli {
     
     
