@@ -1,4 +1,4 @@
-# I Am Committed
+# I am Committed
 
 ## An AI micro bot for generating Git Commits
 
