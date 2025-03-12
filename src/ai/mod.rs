@@ -1,9 +1,38 @@
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, Content, MessageRole};
 use openai_api_rs::v1::common::GPT4_O_MINI;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::PathBuf;
+use chrono::Local;
 
 pub struct AIClient {
     client: OpenAIClient,
+    log_path: PathBuf,
+}
+
+impl AIClient {
+    fn log_interaction(&self, request: &str, response: &str) -> Result<(), AIError> {
+        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let log_entry = format!(
+            "\n=== {} ===\nRequest:\n{}\n\nResponse:\n{}\n\n",
+            timestamp, request, response
+        );
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.log_path)
+            .map_err(|e| AIError {
+                message: format!("Failed to open log file: {}", e),
+            })?;
+
+        file.write_all(log_entry.as_bytes()).map_err(|e| AIError {
+            message: format!("Failed to write to log file: {}", e),
+        })?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -36,7 +65,14 @@ impl AIClient {
                 message: format!("Failed to create OpenAI client: {}", e),
             })?;
 
-        Ok(AIClient { client })
+        // Create logs directory if it doesn't exist
+        fs::create_dir_all("logs").map_err(|e| AIError {
+            message: format!("Failed to create logs directory: {}", e),
+        })?;
+
+        let log_path = PathBuf::from("logs/chatgpt_interactions.log");
+
+        Ok(AIClient { client, log_path })
     }
 
     pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AIError> {
@@ -75,13 +111,18 @@ impl AIClient {
                 message: format!("OpenAI API error: {}", e),
             })?;
 
-        result.choices[0]
+        let response = result.choices[0]
             .message
             .content
             .clone()
             .ok_or_else(|| AIError {
                 message: "No content in OpenAI response".to_string(),
-            })
+            })?;
+
+        // Log the interaction
+        self.log_interaction(diff, &response)?;
+
+        Ok(response)
     }
 }
 
