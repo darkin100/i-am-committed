@@ -40,25 +40,31 @@ impl AIClient {
     }
 
     pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AIError> {
-        let mut chat_message = String::from(
-            "Generate a commit message following the Conventional Commits specification. \
-            Use one of these types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert. \
-            Include a scope in parentheses if relevant. \
-            Example format: \
-            type(scope): description\n\n[optional body]
-            Here are the changes to commit:",
-        );
-        chat_message.push_str(diff);
+        let system_message = chat_completion::ChatCompletionMessage {
+            role: MessageRole::system,
+            content: Content::Text(String::from(
+                "Generate a commit message following the Conventional Commits specification. \
+                Use one of these types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert. \
+                Include a scope in parentheses if relevant. \
+                Example format: \
+                type(scope): description\n\n[optional body]"
+            )),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        };
+
+        let user_message = chat_completion::ChatCompletionMessage {
+            role: MessageRole::user,
+            content: Content::Text(diff.to_string()),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        };
 
         let req = ChatCompletionRequest::new(
             GPT4_O_MINI.to_string(),
-            vec![chat_completion::ChatCompletionMessage {
-                role: MessageRole::user,
-                content: Content::Text(chat_message),
-                name: None,
-                tool_calls: None,
-                tool_call_id: None,
-            }],
+            vec![system_message, user_message],
         );
 
         let result = self
