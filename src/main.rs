@@ -2,6 +2,23 @@ use clap::Parser;
 use std::io::Write;
 use std::{env, io, process::Command};
 use colored::Colorize;
+use log::{info, warn};
+
+fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}] [{}] {}",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Info)
+        .chain(fern::log_file("logs/chatgpt_interactions.log")?)
+        .apply()?;
+    Ok(())
+}
 
 mod commit_formatter;
 mod git;
@@ -20,6 +37,7 @@ struct Cli {}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    setup_logging()?;
     println!(
         "{}",
         r#"
@@ -42,6 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ai_client = AIClient::new(api_key)?;
 
     if !git_client.has_staged_changes()? {
+        warn!("No staged changes found.");
         println!("\n{} No staged changes found.", "!".yellow());
         println!("\n  Please stage your changes using 'git add' before running this command.\n");
         return Ok(());

@@ -6,6 +6,8 @@ description = "A command line application"
 authors = ["Your Name"]
 
 [dependencies]
+fern = "0.6"
+log = "0.4"
 clap = { version = "4.4", features = ["derive"] }
 colored = "2"
 openai-api-rs = "5.2.6"

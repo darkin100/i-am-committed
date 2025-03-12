@@ -1,38 +1,11 @@
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, Content, MessageRole};
 use openai_api_rs::v1::common::GPT4_O_MINI;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::path::PathBuf;
-use chrono::Local;
+use std::fs;
+use log::{info, error};
 
 pub struct AIClient {
     client: OpenAIClient,
-    log_path: PathBuf,
-}
-
-impl AIClient {
-    fn log_interaction(&self, request: &str, response: &str) -> Result<(), AIError> {
-        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let log_entry = format!(
-            "\n=== {} ===\nRequest:\n{}\n\nResponse:\n{}\n\n",
-            timestamp, request, response
-        );
-
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.log_path)
-            .map_err(|e| AIError {
-                message: format!("Failed to open log file: {}", e),
-            })?;
-
-        file.write_all(log_entry.as_bytes()).map_err(|e| AIError {
-            message: format!("Failed to write to log file: {}", e),
-        })?;
-
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -61,18 +34,22 @@ impl AIClient {
         let client = OpenAIClient::builder()
             .with_api_key(api_key)
             .build()
-            .map_err(|e| AIError {
-                message: format!("Failed to create OpenAI client: {}", e),
+            .map_err(|e| {
+                error!("Failed to create OpenAI client: {}", e);
+                AIError {
+                    message: format!("Failed to create OpenAI client: {}", e),
+                }
             })?;
 
         // Create logs directory if it doesn't exist
-        fs::create_dir_all("logs").map_err(|e| AIError {
-            message: format!("Failed to create logs directory: {}", e),
+        fs::create_dir_all("logs").map_err(|e| {
+            error!("Failed to create logs directory: {}", e);
+            AIError {
+                message: format!("Failed to create logs directory: {}", e),
+            }
         })?;
 
-        let log_path = PathBuf::from("logs/chatgpt_interactions.log");
-
-        Ok(AIClient { client, log_path })
+        Ok(AIClient { client })
     }
 
     pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AIError> {
@@ -120,7 +97,8 @@ impl AIClient {
             })?;
 
         // Log the interaction
-        self.log_interaction(diff, &response)?;
+        info!("AI Request:\n{}", diff);
+        info!("AI Response:\n{}", response);
 
         Ok(response)
     }
