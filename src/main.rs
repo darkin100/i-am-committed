@@ -53,14 +53,24 @@ fn commit_changes(git_client: &GitClient, commit_message: &str) -> Result<(), Bo
     println!("🔹 Commit: {}", commit);
     println!("🔹 Message: {}", commit_message);
     println!("-----------------------------------------");
-    println!("🎉 All done! Keep up the great work!");
+    println!("🎉 All done! Keep up the great work!\n");
 
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("{}", "🚀 I am Committed 🚀".green());
+    println!(
+        "{}",
+        r#"
+    ____               _____                 _ __  __         __
+    /  _/ ___ ___ _    / ___/__  __ _  __ _  (_) /_/ /____ ___/ /
+   _/ /  / _ `/  ' \  / /__/ _ \/  ' \/  ' \/ / __/ __/ -_) _  / 
+  /___/  \_,_/_/_/_/  \___/\___/_/_/_/_/_/_/_/\__/\__/\__/\_,_/  
+                                                                 
+      "#
+        .green()
+    );
     println!("\n{}", "🔍 Analyzing Changes...".blue());
     println!("-----------------------------------------");
 
@@ -97,27 +107,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let commit_message = formatted_commit.to_string();
 
     // Generate alternative suggestions
-    let alt1 = CommitFormatter::new(format!("feat({}): {}", 
-        commit_message.split('(').nth(1).unwrap_or("").split(')').next().unwrap_or(""),
-        "remove backticks from commit messages")).format();
-    let alt2 = CommitFormatter::new(format!("refactor({}): standardize commit message formatting", 
-        commit_message.split('(').nth(1).unwrap_or("").split(')').next().unwrap_or(""))).format();
+    //TODO: There is not implementation here for alternative commit messages
+    // let alt1 = CommitFormatter::new(format!("feat({}): {}", 
+    //     commit_message.split('(').nth(1).unwrap_or("").split(')').next().unwrap_or(""),
+    //     "remove backticks from commit messages")).format();
+    // let alt2 = CommitFormatter::new(format!("refactor({}): standardize commit message formatting", 
+    //     commit_message.split('(').nth(1).unwrap_or("").split(')').next().unwrap_or(""))).format();
 
     println!("\n📝 Suggested Commit Message:");
     println!("---------------------------------------------------");
     println!("{}", commit_message);
     println!("---------------------------------------------------");
 
-    println!("\n💡 Alternative Suggestions:");
-    println!("1️⃣ {}", alt1.to_string());
-    println!("2️⃣ {}", alt2.to_string());
-    println!("3️⃣ custom: Edit the message manually");
+    //TODO: This needs to be implemented
+    // println!("\n💡 Alternative Suggestions:");
+    // println!("1️⃣ {}", alt1.to_string());
+    // println!("2️⃣ {}", alt2.to_string());
+    // println!("3️⃣ custom: Edit the message manually");
     
     println!("\nPlease select an option:");
     println!("[1] Use the suggested message ✅ (default)");
-    println!("[2] Choose an alternative");
-    println!("[3] Edit the message manually");
-    println!("[4] Cancel");
+    // println!("[2] Choose an alternative");
+    println!("[2] Edit the message manually");
+    println!("[3] Cancel");
 
     print!("\nEnter your choice (1-4): ⌨️  ");
     io::stdout().flush().unwrap();
@@ -135,27 +147,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let num = num_result.unwrap();
     let final_message = match num {
         1 => commit_message,
+        // 2 => {
+        //     println!("\nChoose an alternative (1-2):");
+        //     println!("[1] {}", alt1.to_string());
+        //     println!("[2] {}", alt2.to_string());
+            
+        //     print!("\nEnter your choice: ");
+        //     io::stdout().flush().unwrap();
+            
+        //     let mut alt_input = String::new();
+        //     io::stdin().read_line(&mut alt_input).expect("Failed to read line");
+            
+        //     match alt_input.trim().parse::<u32>() {
+        //         Ok(1) => alt1.to_string(),
+        //         Ok(2) => alt2.to_string(),
+        //         _ => {
+        //             println!("\nInvalid choice, using original message");
+        //             commit_message
+        //         }
+        //     }
+        // }
         2 => {
-            println!("\nChoose an alternative (1-2):");
-            println!("[1] {}", alt1.to_string());
-            println!("[2] {}", alt2.to_string());
-            
-            print!("\nEnter your choice: ");
-            io::stdout().flush().unwrap();
-            
-            let mut alt_input = String::new();
-            io::stdin().read_line(&mut alt_input).expect("Failed to read line");
-            
-            match alt_input.trim().parse::<u32>() {
-                Ok(1) => alt1.to_string(),
-                Ok(2) => alt2.to_string(),
-                _ => {
-                    println!("\nInvalid choice, using original message");
-                    commit_message
-                }
-            }
-        }
-        3 => {
             // Edit commit message using nano
             use std::fs;
             use tempfile::NamedTempFile;
@@ -191,7 +203,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Proceed with commit if a message was selected/edited
-    if num <= 3 {
+    if num <= 2 {
         commit_changes(&git_client, &final_message)?;
     }
 
