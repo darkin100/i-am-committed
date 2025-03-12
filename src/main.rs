@@ -18,46 +18,6 @@ use ai::AIClient;
 #[command(about = "A small CLI used for generating Git commit messages", long_about = None)]
 struct Cli {}
 
-fn get_current_branch() -> Result<String, Box<dyn std::error::Error>> {
-    let output = Command::new("git")
-        .args(&["rev-parse", "--abbrev-ref", "HEAD"])
-        .output()?;
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
-}
-
-fn get_commit_hash() -> Result<String, Box<dyn std::error::Error>> {
-    let output = Command::new("git")
-        .args(&["rev-parse", "--short", "HEAD"])
-        .output()?;
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
-}
-
-fn commit_changes(git_client: &GitClient, commit_message: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let output = git_client.commit(commit_message)?;
-
-    if !output.status.success() {
-        println!(
-            "{} {}",
-            "Failed to commit changes. Exit status:".red(),
-            output.status
-        );
-        return Ok(());
-    }
-
-    let branch = get_current_branch()?;
-    let commit = get_commit_hash()?;
-
-    println!("\n✅ Commit Successful!");
-    println!("-----------------------------------------");
-    println!("🔹 Branch: {}", branch);
-    println!("🔹 Commit: {}", commit);
-    println!("🔹 Message: {}", commit_message);
-    println!("-----------------------------------------");
-    println!("🎉 All done! Keep up the great work!\n");
-
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
@@ -204,7 +164,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Proceed with commit if a message was selected/edited
     if num <= 2 {
-        commit_changes(&git_client, &final_message)?;
+        git_client.commit_with_details(&final_message).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
     }
 
     Ok(())

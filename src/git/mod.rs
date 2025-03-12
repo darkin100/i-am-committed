@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::process::Output;
+use colored::*;
 
 pub struct GitClient {
     working_dir: Option<String>,
@@ -60,6 +61,42 @@ impl GitClient {
         command.output().map_err(|e| GitError {
             message: format!("Git command failed: {}", e),
         })
+    }
+
+    pub fn get_current_branch(&self) -> Result<String, GitError> {
+        let output = self.run_git_command(&["rev-parse", "--abbrev-ref", "HEAD"])?;
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    }
+
+    pub fn get_commit_hash(&self) -> Result<String, GitError> {
+        let output = self.run_git_command(&["rev-parse", "--short", "HEAD"])?;
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    }
+
+    pub fn commit_with_details(&self, commit_message: &str) -> Result<(), GitError> {
+        let output = self.commit(commit_message)?;
+
+        if !output.status.success() {
+            println!(
+                "{} {}",
+                "Failed to commit changes. Exit status:".red(),
+                output.status
+            );
+            return Ok(());
+        }
+
+        let branch = self.get_current_branch()?;
+        let commit = self.get_commit_hash()?;
+
+        println!("\n✅ Commit Successful!");
+        println!("-----------------------------------------");
+        println!("🔹 Branch: {}", branch);
+        println!("🔹 Commit: {}", commit);
+        println!("🔹 Message: {}", commit_message);
+        println!("-----------------------------------------");
+        println!("🎉 All done! Keep up the great work!\n");
+
+        Ok(())
     }
 }
 
