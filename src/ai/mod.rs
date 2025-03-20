@@ -1,7 +1,7 @@
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, Content, MessageRole};
 use openai_api_rs::v1::common::GPT4_O_MINI;
-use std::fs;
+use std::{fs, env};
 use log::{info, error};
 
 pub struct AIClient {
@@ -42,7 +42,9 @@ impl AIClient {
             })?;
 
         // Create logs directory if it doesn't exist
-        fs::create_dir_all("logs").map_err(|e| {
+        let home = env::var("HOME").expect("Failed to get HOME directory");
+        let log_dir = format!("{}/.iamcommitted/logs", home);
+        fs::create_dir_all(&log_dir).map_err(|e| {
             error!("Failed to create logs directory: {}", e);
             AIError {
                 message: format!("Failed to create logs directory: {}", e),

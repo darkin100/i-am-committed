@@ -5,6 +5,10 @@ use colored::Colorize;
 use log::{info, warn};
 
 fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
+    let home = env::var("HOME").expect("Failed to get HOME directory");
+    let log_dir = format!("{}/.iamcommitted/logs", home);
+    std::fs::create_dir_all(&log_dir)?;
+    
     fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -15,7 +19,7 @@ fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
             ))
         })
         .level(log::LevelFilter::Info)
-        .chain(fern::log_file("logs/chatgpt_interactions.log")?)
+        .chain(fern::log_file(format!("{}/chatgpt_interactions.log", log_dir))?)
         .apply()?;
     Ok(())
 }
