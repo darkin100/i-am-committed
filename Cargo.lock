@@ -626,6 +626,8 @@ dependencies = [
  "log",
  "openai-api-rs",
  "regex",
+ "serde",
+ "serde_json",
  "tempfile",
  "termion",
  "tokio",

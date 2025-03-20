@@ -3,6 +3,18 @@ use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, Content, M
 use openai_api_rs::v1::common::GPT4_O_MINI;
 use std::{fs, env};
 use log::{info, error};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct Prompts {
+    commit_message: CommitMessagePrompt,
+}
+
+#[derive(Deserialize)]
+struct CommitMessagePrompt {
+    system: String,
+    user: String,
+}
 
 pub struct AIClient {
     client: OpenAIClient,
@@ -55,15 +67,20 @@ impl AIClient {
     }
 
     pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AIError> {
+        // Load and parse prompts configuration
+        let prompts_json = fs::read_to_string("src/config/prompts.json")
+            .map_err(|e| AIError {
+                message: format!("Failed to read prompts configuration: {}", e),
+            })?;
+        
+        let prompts: Prompts = serde_json::from_str(&prompts_json)
+            .map_err(|e| AIError {
+                message: format!("Failed to parse prompts configuration: {}", e),
+            })?;
+
         let system_message = chat_completion::ChatCompletionMessage {
             role: MessageRole::system,
-            content: Content::Text(String::from(
-                "Generate a commit message following the Conventional Commits specification. \
-                Use one of these types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert. \
-                Include a scope in parentheses if relevant. \
-                Example format: \
-                type(scope): description\n\n[optional body]"
-            )),
+            content: Content::Text(prompts.commit_message.system),
             name: None,
             tool_calls: None,
             tool_call_id: None,
@@ -71,7 +88,7 @@ impl AIClient {
 
         let user_message = chat_completion::ChatCompletionMessage {
             role: MessageRole::user,
-            content: Content::Text(diff.to_string()),
+            content: Content::Text(prompts.commit_message.user.replace("{diff}", diff)),
             name: None,
             tool_calls: None,
             tool_call_id: None,

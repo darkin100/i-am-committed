@@ -1,0 +1,6 @@
+{
+    "commit_message": {
+        "system": "Generate a commit message following the Conventional Commits specification. Use one of these types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert. Include a scope in parentheses if relevant. Example format: type(scope): description\n\n[optional body]",
+        "user": "{diff}"
+    }
+}
