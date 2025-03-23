@@ -3,18 +3,7 @@ use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, Content, M
 use openai_api_rs::v1::common::GPT4_O_MINI;
 use std::{fs, env};
 use log::{info, error};
-use serde::Deserialize;
-
-#[derive(Deserialize)]
-struct Prompts {
-    commit_message: CommitMessagePrompt,
-}
-
-#[derive(Deserialize)]
-struct CommitMessagePrompt {
-    system: String,
-    user: String,
-}
+use regex::Regex;
 
 pub struct AIClient {
     client: OpenAIClient,
@@ -67,20 +56,39 @@ impl AIClient {
     }
 
     pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AIError> {
-        // Load and parse prompts configuration
-        let prompts_json = fs::read_to_string("src/config/prompts.json")
+        // Load and parse prompts from markdown
+        let prompts_md = fs::read_to_string("src/config/prompts.md")
             .map_err(|e| AIError {
-                message: format!("Failed to read prompts configuration: {}", e),
+                message: format!("Failed to read prompts markdown: {}", e),
             })?;
-        
-        let prompts: Prompts = serde_json::from_str(&prompts_json)
+
+        // Extract system prompt
+        let system_re = Regex::new(r"(?s)## System Prompt\n\n(.*?)\n\n##")
             .map_err(|e| AIError {
-                message: format!("Failed to parse prompts configuration: {}", e),
+                message: format!("Failed to compile system prompt regex: {}", e),
+            })?;
+        let system_prompt = system_re.captures(&prompts_md)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().trim())
+            .ok_or_else(|| AIError {
+                message: "Failed to extract system prompt from markdown".to_string(),
+            })?;
+
+        // Extract user prompt
+        let user_re = Regex::new(r"(?s)## User Prompt\n\n(.*)$")
+            .map_err(|e| AIError {
+                message: format!("Failed to compile user prompt regex: {}", e),
+            })?;
+        let user_prompt = user_re.captures(&prompts_md)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().trim())
+            .ok_or_else(|| AIError {
+                message: "Failed to extract user prompt from markdown".to_string(),
             })?;
 
         let system_message = chat_completion::ChatCompletionMessage {
             role: MessageRole::system,
-            content: Content::Text(prompts.commit_message.system),
+            content: Content::Text(system_prompt.to_string()),
             name: None,
             tool_calls: None,
             tool_call_id: None,
@@ -88,7 +96,7 @@ impl AIClient {
 
         let user_message = chat_completion::ChatCompletionMessage {
             role: MessageRole::user,
-            content: Content::Text(prompts.commit_message.user.replace("{diff}", diff)),
+            content: Content::Text(user_prompt.replace("{diff}", diff)),
             name: None,
             tool_calls: None,
             tool_call_id: None,
