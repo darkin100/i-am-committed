@@ -33,14 +33,12 @@ use git::GitClient;
 use ai::AIClient;
 
 #[derive(Parser)]
-#[command(name = "iamcommitted")]
-#[command(author = "Your Name")]
-#[command(version = "1.0")]
-#[command(about = "A small CLI used for generating Git commit messages", long_about = None)]
+#[command(author, version, about, long_about = None)]
 struct Cli {}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
     setup_logging()?;
     println!(
         "{}",
@@ -53,7 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       "#
         .green()
     );
-    println!("\n{}", "🔍 Analyzing Changes...".blue());
+    println!("{}", VERSION);
+    println!("\n{}", "🔍 Analysing Changes...".blue());
     println!("-----------------------------------------");
 
     let api_key = env::var("OPENAI_API_KEY").map_err(|_| {
