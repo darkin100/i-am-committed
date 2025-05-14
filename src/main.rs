@@ -113,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[2] Edit the message manually");
     println!("[3] Cancel");
 
-    print!("\nEnter your choice (1-4): ⌨️  ");
+    print!("\nEnter your choice (1-3): ⌨️  ");
     io::stdout().flush().unwrap();
 
     let mut input = String::new();
