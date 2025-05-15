@@ -88,24 +88,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let formatted_commit = formatter.format();
     let commit_message = formatted_commit.to_string();
 
-    // Generate alternative suggestions
-    //TODO: There is not implementation here for alternative commit messages
-    // let alt1 = CommitFormatter::new(format!("feat({}): {}", 
-    //     commit_message.split('(').nth(1).unwrap_or("").split(')').next().unwrap_or(""),
-    //     "remove backticks from commit messages")).format();
-    // let alt2 = CommitFormatter::new(format!("refactor({}): standardize commit message formatting", 
-    //     commit_message.split('(').nth(1).unwrap_or("").split(')').next().unwrap_or(""))).format();
-
     println!("\n📝 Suggested Commit Message:");
     println!("---------------------------------------------------");
     println!("{}", commit_message);
     println!("---------------------------------------------------");
-
-    //TODO: This needs to be implemented
-    // println!("\n💡 Alternative Suggestions:");
-    // println!("1️⃣ {}", alt1.to_string());
-    // println!("2️⃣ {}", alt2.to_string());
-    // println!("3️⃣ custom: Edit the message manually");
     
     println!("\nPlease select an option:");
     println!("[1] Use the suggested message ✅ (default)");
@@ -129,26 +115,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let num = num_result.unwrap();
     let final_message = match num {
         1 => commit_message,
-        // 2 => {
-        //     println!("\nChoose an alternative (1-2):");
-        //     println!("[1] {}", alt1.to_string());
-        //     println!("[2] {}", alt2.to_string());
-            
-        //     print!("\nEnter your choice: ");
-        //     io::stdout().flush().unwrap();
-            
-        //     let mut alt_input = String::new();
-        //     io::stdin().read_line(&mut alt_input).expect("Failed to read line");
-            
-        //     match alt_input.trim().parse::<u32>() {
-        //         Ok(1) => alt1.to_string(),
-        //         Ok(2) => alt2.to_string(),
-        //         _ => {
-        //             println!("\nInvalid choice, using original message");
-        //             commit_message
-        //         }
-        //     }
-        // }
         2 => {
             // Edit commit message using nano
             use std::fs;
