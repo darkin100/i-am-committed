@@ -26,6 +26,7 @@ Another interesting aspect of this project is that I am using it to generate my 
     - [Areas of Learning:](#areas-of-learning)
   - [Table of Contents](#table-of-contents)
   - [Setup](#setup)
+    - [Install Rust \& Cargo](#install-rust--cargo)
     - [Build and Install](#build-and-install)
     - [Running the Application from command line](#running-the-application-from-command-line)
   - [Unit Tests](#unit-tests)
@@ -36,9 +37,16 @@ Another interesting aspect of this project is that I am using it to generate my 
 To set up the repository, clone it to your local machine:
 
 ```sh
-git clone https://github.com/<github>/iamcommitted.git
+git clone https://github.com/darkin100/iamcommitted.git
 cd iamcommitted
 ```
+
+### Install Rust & Cargo
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
 ### Build and Install
 
 To build and install the command line tool, use the following command:
@@ -53,6 +61,12 @@ The CLI currently uses OpenAIs API. So you will need to get your [own API key](h
 
 ```sh
 export OPENAI_API_KEY=<key>
+```
+
+or update your  .bashrc file with your API Key.
+
+```sh
+echo 'export OPENAI_API_KEY="your_api_key_here"' >> ~/.bashrc
 ```
 
 To execute the command, its as simple as:
