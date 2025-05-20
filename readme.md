@@ -29,6 +29,7 @@ Another interesting aspect of this project is that I am using it to generate my 
     - [Install Rust \& Cargo](#install-rust--cargo)
     - [Build and Install](#build-and-install)
     - [Running the Application from command line](#running-the-application-from-command-line)
+    - [Using as a `prepare-commit-msg` Hook](#using-as-a-prepare-commit-msg-hook)
   - [Unit Tests](#unit-tests)
     - [References](#references)
 
@@ -83,6 +84,51 @@ refactor(commit_formatter): remove unused import of CommitType
 
 This commit removes the unused import of `CommitType` from the `commit_formatter` module, helping to clean up the code and improve readability.
 ```
+
+### Using as a `prepare-commit-msg` Hook
+
+`i-am-committed` can also be used as a Git `prepare-commit-msg` hook to automatically generate a commit message before your editor opens.
+
+#### Installation
+
+1.  **Build the binary:**
+    Ensure you have built the `i-am-committed` executable. You can do this with:
+    ```sh
+    cargo build
+    ```
+    Or for a release version:
+    ```sh
+    cargo build --release
+    ```
+    The hook script (`hooks/prepare-commit-msg.sh`) expects the binary to be in `target/debug/i-am-committed` or `target/release/i-am-committed`.
+
+2.  **Make the hook script executable:**
+    ```sh
+    chmod +x hooks/prepare-commit-msg.sh
+    ```
+
+3.  **Install the hook:**
+    Copy or symlink the provided `hooks/prepare-commit-msg.sh` script to your local repository's `.git/hooks/` directory.
+
+    To copy:
+    ```sh
+    cp hooks/prepare-commit-msg.sh .git/hooks/prepare-commit-msg
+    ```
+
+    To symlink (recommended, so updates to the script in the repository are automatically reflected):
+    ```sh
+    ln -s -f ../../hooks/prepare-commit-msg.sh .git/hooks/prepare-commit-msg
+    ```
+    *(Ensure you run this command from the root of your repository.)*
+
+#### Usage
+
+Once installed, the hook will automatically run when you execute `git commit`.
+
+- If you run `git commit` without `-m` or a template, `i-am-committed` will generate a message and write it to the commit message file. Your editor will then open with this pre-filled message.
+- If you use `git commit -m "Your message"` or have a commit template configured, `i-am-committed` will not overwrite your message or template.
+
+You still need to have your `OPENAI_API_KEY` environment variable set for the hook to function correctly.
 
 ## Unit Tests
 
