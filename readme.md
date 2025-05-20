@@ -50,15 +50,27 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ### Build and Install
 
-To build and install the command line tool, use the following command:
+To build the command line tool:
 
 ```sh
-cargo install --path .
+cargo build --release
 ```
+
+This will create the executable at `target/release/iamcommitted`.
+
+To make it accessible system-wide (and for the Git hook), you can copy it to a directory in your PATH, such as `/usr/local/bin`:
+
+```sh
+sudo cp target/release/iamcommitted /usr/local/bin/
+```
+
+Alternatively, `cargo install --path .` will install it to your Cargo binary directory (e.g., `~/.cargo/bin/`). If you use this method, ensure `~/.cargo/bin/` is in your system's PATH and the hook script is adjusted accordingly if you don't symlink/copy to `/usr/local/bin`. For simplicity, the provided hook script assumes `/usr/local/bin/iamcommitted`.
 
 ### Running the Application from command line
 
-The CLI currently uses OpenAIs API. So you will need to get your [own API key](https://platform.openai.com/) and set it as an environment variable, or as part of your vscode launch.json
+If you've installed `iamcommitted` to `/usr/local/bin` or another directory in your PATH, you can run it directly.
+
+The CLI currently uses OpenAI's API. So you will need to get your [own API key](https://platform.openai.com/) and set it as an environment variable, or as part of your vscode launch.json
 
 ```sh
 export OPENAI_API_KEY=<key>
@@ -91,23 +103,21 @@ This commit removes the unused import of `CommitType` from the `commit_formatter
 
 #### Installation
 
-1.  **Build the binary:**
-    Ensure you have built the `i-am-committed` executable. You can do this with:
-    ```sh
-    cargo build
-    ```
-    Or for a release version:
+1.  **Build and Install the `iamcommitted` binary:**
+    Ensure you have built the `iamcommitted` executable and placed it in `/usr/local/bin/`.
     ```sh
     cargo build --release
+    sudo cp target/release/iamcommitted /usr/local/bin/
     ```
-    The hook script (`hooks/prepare-commit-msg.sh`) expects the binary to be in `target/debug/i-am-committed` or `target/release/i-am-committed`.
+    Make sure `/usr/local/bin/iamcommitted` is executable. The `cp` command should preserve permissions, but you can verify with `ls -l /usr/local/bin/iamcommitted`.
+    The hook script (`hooks/prepare-commit-msg.sh`) now expects the binary to be at `/usr/local/bin/iamcommitted`.
 
 2.  **Make the hook script executable:**
     ```sh
     chmod +x hooks/prepare-commit-msg.sh
     ```
 
-3.  **Install the hook:**
+3.  **Install the Git hook script:**
     Copy or symlink the provided `hooks/prepare-commit-msg.sh` script to your local repository's `.git/hooks/` directory.
 
     To copy:

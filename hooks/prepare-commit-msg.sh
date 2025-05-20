@@ -7,20 +7,17 @@
 # 2. The type of commit (e.g., message, template, merge, squash, commit).
 # 3. The commit SHA-1 if -c, -C, or --fixup is given.
 
-# Assuming the iamcommitted binary is in the target/release directory
-# and the hook is run from the root of the repository.
+# Assuming the iamcommitted binary is installed in /usr/local/bin
 # Adjust the path to the binary if necessary.
-EXECUTABLE_PATH="./target/release/iamcommitted"
+EXECUTABLE_PATH="/usr/local/bin/iamcommitted"
 
-# Check if the executable exists
+# Check if the executable exists and is executable
 if [ ! -x "$EXECUTABLE_PATH" ]; then
-  # Fallback to debug if release is not found
-  EXECUTABLE_PATH="./target/debug/iamcommitted"
-  if [ ! -x "$EXECUTABLE_PATH" ]; then
-    echo "Error: iamcommitted executable not found or not executable at $EXECUTABLE_PATH or ./target/release/iamcommitted."
-    echo "Please build the project using 'cargo build' or 'cargo build --release'."
-    exit 1
-  fi
+  echo "Error: iamcommitted executable not found or not executable at $EXECUTABLE_PATH."
+  echo "Please ensure 'iamcommitted' is built and installed to /usr/local/bin."
+  echo "You can build with 'cargo build --release' and then copy 'target/release/iamcommitted' to '/usr/local/bin/',"
+  echo "or use 'cargo install --path .' if your cargo bin directory is in your PATH and then symlink/copy from there."
+  exit 1
 fi
 
 # Pass all arguments to the iamcommitted binary
