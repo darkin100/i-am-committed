@@ -63,10 +63,10 @@ The CLI currently uses OpenAIs API. So you will need to get your [own API key](h
 export OPENAI_API_KEY=<key>
 ```
 
-or update your  .bashrc file with your API Key.
+or update your terminal profile .zshrc file with your API Key.
 
 ```sh
-echo 'export OPENAI_API_KEY="your_api_key_here"' >> ~/.bashrc
+echo 'export OPENAI_API_KEY="your_api_key_here"' >> ~/.zshrc
 ```
 
 To execute the command, its as simple as:
