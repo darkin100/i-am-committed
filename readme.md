@@ -30,6 +30,8 @@ Another interesting aspect of this project is that I am using it to generate my 
     - [Build and Install](#build-and-install)
     - [Running the Application from command line](#running-the-application-from-command-line)
     - [Using as a `prepare-commit-msg` Hook](#using-as-a-prepare-commit-msg-hook)
+      - [Installation](#installation)
+      - [Usage](#usage)
   - [Unit Tests](#unit-tests)
     - [References](#references)
 
@@ -104,6 +106,7 @@ This commit removes the unused import of `CommitType` from the `commit_formatter
 #### Installation
 
 1.  **Build and Install the `iamcommitted` binary:**
+
     Ensure you have built the `iamcommitted` executable and placed it in `/usr/local/bin/`.
     ```sh
     cargo build --release
