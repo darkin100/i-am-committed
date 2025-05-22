@@ -1,22 +1,142 @@
-name: Rust
+name: Rust Build and Release
 
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - 'v*' # Run workflow on version tags, e.g. v1.0.0
   pull_request:
     branches: [ "main" ]
 
 env:
   CARGO_TERM_COLOR: always
+  HOMEBREW_TAP_REPO: darkin100/homebrew-iamcommitted # Replace with your GitHub username
 
 jobs:
+  # Keep the existing build job for regular CI
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+
+  # Add a new job for macOS builds and releases
+  release:
+    name: Build and Release
+    runs-on: macos-latest
+    # Only run this job when a tag is pushed
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build # Make sure the regular build passes first
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+    
+    - name: Add macOS Targets
+      run: |
+        rustup target add x86_64-apple-darwin
+        rustup target add aarch64-apple-darwin
+    
+    - name: Build for Intel Mac (x86_64)
+      run: cargo build --release --target x86_64-apple-darwin
+    
+    - name: Build for Apple Silicon (aarch64)
+      run: cargo build --release --target aarch64-apple-darwin
+    
+    - name: Create Universal Binary
+      run: |
+        mkdir -p target/universal-apple-darwin/release
+        lipo -create \
+          target/x86_64-apple-darwin/release/iamcommitted \
+          target/aarch64-apple-darwin/release/iamcommitted \
+          -output target/universal-apple-darwin/release/iamcommitted
+    
+    - name: Generate Checksums
+      run: |
+        cd target/universal-apple-darwin/release
+        shasum -a 256 iamcommitted > iamcommitted.sha256
+    
+    - name: Create Release Archive
+      run: |
+        cd target/universal-apple-darwin/release
+        tar -czf iamcommitted-${{ github.ref_name }}-macos.tar.gz iamcommitted
+        shasum -a 256 iamcommitted-${{ github.ref_name }}-macos.tar.gz > iamcommitted-${{ github.ref_name }}-macos.tar.gz.sha256
+    
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/universal-apple-darwin/release/iamcommitted-${{ github.ref_name }}-macos.tar.gz
+          target/universal-apple-darwin/release/iamcommitted-${{ github.ref_name }}-macos.tar.gz.sha256
+        draft: false
+        prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract Release Info
+      id: release_info
+      run: |
+        echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        echo "tarball_url=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/iamcommitted-${{ github.ref_name }}-macos.tar.gz" >> $GITHUB_OUTPUT
+        SHA256=$(cat target/universal-apple-darwin/release/iamcommitted-${{ github.ref_name }}-macos.tar.gz.sha256 | awk '{print $1}')
+        echo "sha256=${SHA256}" >> $GITHUB_OUTPUT
+    
+    # This step requires a personal access token with repo scope
+    - name: Update Homebrew Formula
+      if: success() && !contains(github.ref, 'alpha') # Only update formula for non-alpha releases
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.HOMEBREW_TAP_REPO }}
+        token: ${{ secrets.HOMEBREW_TAP_TOKEN }} # You'll need to create this secret
+        path: homebrew-tap
+    
+    - name: Create or Update Formula
+      if: success() && !contains(github.ref, 'alpha') # Only update formula for non-alpha releases
+      run: |
+        mkdir -p homebrew-tap/Formula
+        cat > homebrew-tap/Formula/iamcommitted.rb << EOF
+        class Iamcommitted < Formula
+          desc "AI micro bot for generating Git commit messages"
+          homepage "https://github.com/${{ github.repository }}"
+          url "${{ steps.release_info.outputs.tarball_url }}"
+          sha256 "${{ steps.release_info.outputs.sha256 }}"
+          version "${{ steps.release_info.outputs.version }}"
+          license "MIT" # Update with your actual license
+        
+          def install
+            bin.install "iamcommitted"
+          end
+        
+          test do
+            assert_match "iamcommitted #{version}", shell_output("#{bin}/iamcommitted --version")
+          end
+        
+          def caveats
+            <<~EOS
+              This application requires an OpenAI API key to function.
+              Please set the OPENAI_API_KEY environment variable:
+                export OPENAI_API_KEY="your_api_key_here"
+            EOS
+          end
+        end
+        EOF
+    
+    - name: Commit and Push Formula
+      if: success() && !contains(github.ref, 'alpha') # Only update formula for non-alpha releases
+      run: |
+        cd homebrew-tap
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add Formula/iamcommitted.rb
+        git commit -m "Update iamcommitted to ${{ github.ref_name }}"
+        git push
