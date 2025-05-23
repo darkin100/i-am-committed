@@ -27,6 +27,8 @@ jobs:
   release:
     name: Build and Release
     runs-on: macos-latest
+    permissions:
+      contents: write  # Add this line
     # Only run this job when a tag is pushed
     if: startsWith(github.ref, 'refs/tags/')
     needs: build # Make sure the regular build passes first
