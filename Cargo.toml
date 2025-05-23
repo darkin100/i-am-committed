@@ -1,6 +1,6 @@
 [package]
 name = "iamcommitted"
-version = "v1.0.0"
+version = "1.0.0"
 edition = "2021"
 description = "A command line application that generates Git commit messages based on the Git diff."
 authors = ["Glyn Darkin"]
