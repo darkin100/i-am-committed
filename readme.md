@@ -84,6 +84,24 @@ or update your terminal profile .zshrc file with your API Key.
 echo 'export OPENAI_API_KEY="your_api_key_here"' >> ~/.zshrc
 ```
 
+You can also specify which OpenAI model to use by setting the `OPENAI_MODEL` environment variable. If not specified, it defaults to `gpt-4o-mini`.
+
+```sh
+export OPENAI_MODEL="gpt-4o"  # Use GPT-4o instead of the default
+```
+
+or add it to your terminal profile:
+
+```sh
+echo 'export OPENAI_MODEL="gpt-4o"' >> ~/.zshrc
+```
+
+Supported models include:
+- `gpt-4o-mini` (default)
+- `gpt-4o`
+- `gpt-3.5-turbo`
+- `gpt-4-turbo`
+
 To execute the command, its as simple as:
 
 ```sh
@@ -141,7 +159,7 @@ Once installed, the hook will automatically run when you execute `git commit`.
 - If you run `git commit` without `-m` or a template, `i-am-committed` will generate a message and write it to the commit message file. Your editor will then open with this pre-filled message.
 - If you use `git commit -m "Your message"` or have a commit template configured, `i-am-committed` will not overwrite your message or template.
 
-You still need to have your `OPENAI_API_KEY` environment variable set for the hook to function correctly.
+You still need to have your `OPENAI_API_KEY` environment variable set for the hook to function correctly. The `OPENAI_MODEL` environment variable will also be respected by the hook if set.
 
 ## Unit Tests
 

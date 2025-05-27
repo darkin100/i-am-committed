@@ -6,6 +6,7 @@ use log::{info, error};
 
 pub struct AIClient {
     client: OpenAIClient,
+    model: String,
 }
 
 #[derive(Debug)]
@@ -51,7 +52,13 @@ impl AIClient {
             }
         })?;
 
-        Ok(AIClient { client })
+        // Get model from environment variable or use default
+        let model = env::var("OPENAI_MODEL")
+            .unwrap_or_else(|_| GPT4_O_MINI.to_string());
+        
+        info!("Using OpenAI model: {}", model);
+
+        Ok(AIClient { client, model })
     }
 
     pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AIError> {
@@ -78,7 +85,7 @@ impl AIClient {
         };
 
         let req = ChatCompletionRequest::new(
-            GPT4_O_MINI.to_string(),
+            self.model.clone(),
             vec![system_message, user_message],
         );
 
@@ -116,6 +123,8 @@ mod tests {
     async fn test_generate_commit_message() {
         // This test requires a valid OpenAI API key in the environment
         if let Ok(api_key) = env::var("OPENAI_API_KEY") {
+            // Set a test model or use default
+            env::set_var("OPENAI_MODEL", "gpt-3.5-turbo");
             let client = AIClient::new(api_key).unwrap();
             let diff = "diff --git a/src/main.rs b/src/main.rs
                        index 123..456 789
@@ -139,7 +148,18 @@ mod tests {
 
     #[test]
     fn test_new_client_with_invalid_key() {
-        let result = AIClient::new("invalid_key".to_string());
-        assert!(result.is_ok()); // Client creation succeeds, but API calls would fail
+        // Test with default model first
+        env::remove_var("OPENAI_MODEL");
+        let default_result = AIClient::new("invalid_key".to_string());
+        assert!(default_result.is_ok()); // Client creation succeeds, but API calls would fail
+        let default_client = default_result.unwrap();
+        assert_eq!(default_client.model, GPT4_O_MINI.to_string());
+        
+        // Test with custom model
+        env::set_var("OPENAI_MODEL", "custom-model");
+        let custom_result = AIClient::new("invalid_key".to_string());
+        assert!(custom_result.is_ok());
+        let custom_client = custom_result.unwrap();
+        assert_eq!(custom_client.model, "custom-model");
     }
 }
