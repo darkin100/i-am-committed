@@ -32,15 +32,20 @@ impl From<Box<dyn std::error::Error>> for AIError {
 
 impl AIClient {
     pub fn new(api_key: String) -> Result<Self, AIError> {
-        let client = OpenAIClient::builder()
-            .with_api_key(api_key)
-            .build()
-            .map_err(|e| {
-                error!("Failed to create OpenAI client: {}", e);
-                AIError {
-                    message: format!("Failed to create OpenAI client: {}", e),
-                }
-            })?;
+        let mut builder = OpenAIClient::builder().with_api_key(api_key);
+        
+        // Check for custom endpoint in environment variable
+        if let Ok(custom_endpoint) = env::var("OPENAI_ENDPOINT") {
+            info!("Using custom OpenAI endpoint: {}", custom_endpoint);
+            builder = builder.with_endpoint(custom_endpoint);
+        }
+        
+        let client = builder.build().map_err(|e| {
+            error!("Failed to create OpenAI client: {}", e);
+            AIError {
+                message: format!("Failed to create OpenAI client: {}", e),
+            }
+        })?;
 
         // Create logs directory if it doesn't exist
         let home = env::var("HOME").expect("Failed to get HOME directory");
@@ -161,5 +166,16 @@ mod tests {
         assert!(custom_result.is_ok());
         let custom_client = custom_result.unwrap();
         assert_eq!(custom_client.model, "custom-model");
+    }
+    
+    #[test]
+    fn test_custom_endpoint() {
+        // Test with custom endpoint
+        env::set_var("OPENAI_ENDPOINT", "https://custom-openai-endpoint.example.com");
+        let result = AIClient::new("test_key".to_string());
+        assert!(result.is_ok());
+        
+        // Clean up environment after test
+        env::remove_var("OPENAI_ENDPOINT");
     }
 }
