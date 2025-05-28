@@ -3,6 +3,7 @@ use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, Content, M
 use openai_api_rs::v1::common::GPT4_O_MINI;
 use std::{fs, env};
 use log::{info, error};
+use regex::Regex;
 
 pub struct AIClient {
     client: OpenAIClient,
@@ -67,15 +68,39 @@ impl AIClient {
     }
 
     pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AIError> {
+        // Load and parse prompts from markdown
+        let prompts_md = fs::read_to_string("src/config/prompts.md")
+            .map_err(|e| AIError {
+                message: format!("Failed to read prompts markdown: {}", e),
+            })?;
+
+        // Extract system prompt
+        let system_re = Regex::new(r"(?s)## System Prompt\n\n(.*?)\n\n##")
+            .map_err(|e| AIError {
+                message: format!("Failed to compile system prompt regex: {}", e),
+            })?;
+        let system_prompt = system_re.captures(&prompts_md)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().trim())
+            .ok_or_else(|| AIError {
+                message: "Failed to extract system prompt from markdown".to_string(),
+            })?;
+
+        // Extract user prompt
+        let user_re = Regex::new(r"(?s)## User Prompt\n\n(.*)$")
+            .map_err(|e| AIError {
+                message: format!("Failed to compile user prompt regex: {}", e),
+            })?;
+        let user_prompt = user_re.captures(&prompts_md)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().trim())
+            .ok_or_else(|| AIError {
+                message: "Failed to extract user prompt from markdown".to_string(),
+            })?;
+
         let system_message = chat_completion::ChatCompletionMessage {
             role: MessageRole::system,
-            content: Content::Text(String::from(
-                "Generate a commit message following the Conventional Commits specification. \
-                Use one of these types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert. \
-                Include a scope in parentheses if relevant. \
-                Example format: \
-                type(scope): description\n\n[optional body]"
-            )),
+            content: Content::Text(system_prompt.to_string()),
             name: None,
             tool_calls: None,
             tool_call_id: None,
@@ -83,7 +108,7 @@ impl AIClient {
 
         let user_message = chat_completion::ChatCompletionMessage {
             role: MessageRole::user,
-            content: Content::Text(diff.to_string()),
+            content: Content::Text(user_prompt.replace("{diff}", diff)),
             name: None,
             tool_calls: None,
             tool_call_id: None,

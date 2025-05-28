@@ -11,7 +11,7 @@ I-am-committed is a simple tool to solve a common problem: poor Git commit messa
 
 Another interesting aspect of this project is that I am using it to generate my own commit messages for this project, so the Git commit history will show the evolution of the results.
 
-### Areas of Learning:
+### Areas of Learning
 
 - Rust
 - LLM performance characteristics
@@ -23,7 +23,7 @@ Another interesting aspect of this project is that I am using it to generate my 
 
 - [I Am Committed](#i-am-committed)
   - [An AI micro bot for generating Git Commits](#an-ai-micro-bot-for-generating-git-commits)
-    - [Areas of Learning:](#areas-of-learning)
+    - [Areas of Learning](#areas-of-learning)
   - [Table of Contents](#table-of-contents)
   - [Setup](#setup)
     - [Install Rust \& Cargo](#install-rust--cargo)
@@ -97,6 +97,7 @@ echo 'export OPENAI_MODEL="gpt-4o"' >> ~/.zshrc
 ```
 
 Supported models include:
+
 - `gpt-4o-mini` (default)
 - `gpt-4o`
 - `gpt-3.5-turbo`
@@ -123,33 +124,39 @@ This commit removes the unused import of `CommitType` from the `commit_formatter
 
 #### Installation
 
-1.  **Build and Install the `iamcommitted` binary:**
+1. **Build and Install the `iamcommitted` binary:**
 
     Ensure you have built the `iamcommitted` executable and placed it in `/usr/local/bin/`.
+
     ```sh
     cargo build --release
     sudo cp target/release/iamcommitted /usr/local/bin/
     ```
+
     Make sure `/usr/local/bin/iamcommitted` is executable. The `cp` command should preserve permissions, but you can verify with `ls -l /usr/local/bin/iamcommitted`.
     The hook script (`hooks/prepare-commit-msg.sh`) now expects the binary to be at `/usr/local/bin/iamcommitted`.
 
-2.  **Make the hook script executable:**
+2. **Make the hook script executable:**
+
     ```sh
     chmod +x hooks/prepare-commit-msg.sh
     ```
 
-3.  **Install the Git hook script:**
+3. **Install the Git hook script:**
     Copy or symlink the provided `hooks/prepare-commit-msg.sh` script to your local repository's `.git/hooks/` directory.
 
     To copy:
+
     ```sh
     cp hooks/prepare-commit-msg.sh .git/hooks/prepare-commit-msg
     ```
 
     To symlink (recommended, so updates to the script in the repository are automatically reflected):
+
     ```sh
     ln -s -f ../../hooks/prepare-commit-msg.sh .git/hooks/prepare-commit-msg
     ```
+
     *(Ensure you run this command from the root of your repository.)*
 
 #### Usage
