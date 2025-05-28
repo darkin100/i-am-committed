@@ -5,12 +5,12 @@ use std::{env, io, process::Command};
 use colored::Colorize;
 use log::{info, warn};
 
-fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
+fn setup_logging(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let home = env::var("HOME").expect("Failed to get HOME directory");
     let log_dir = format!("{}/.iamcommitted/logs", home);
     std::fs::create_dir_all(&log_dir)?;
     
-    fern::Dispatch::new()
+    let dispatch = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
                 "[{}] [{}] {}",
@@ -20,8 +20,15 @@ fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
             ))
         })
         .level(log::LevelFilter::Info)
-        .chain(fern::log_file(format!("{}/chatgpt_interactions.log", log_dir))?)
-        .apply()?;
+        .chain(fern::log_file(format!("{}/chatgpt_interactions.log", log_dir))?);
+    
+    // If verbose mode is enabled, also log to stdout
+    if verbose {
+        dispatch.chain(std::io::stdout()).apply()?;
+    } else {
+        dispatch.apply()?;
+    }
+    
     Ok(())
 }
 
@@ -36,6 +43,10 @@ use crate::ai::AIClient;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+    /// Enable verbose mode to print logs to console as well
+    #[arg(long = "verbose", short = 'v')]
+    verbose: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -92,9 +103,15 @@ async fn generate_formatted_commit_message(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const VERSION: &str = env!("CARGO_PKG_VERSION");
-    setup_logging()?;
-
+    
     let cli = Cli::parse();
+    
+    // Set up logging with verbose flag if provided
+    setup_logging(cli.verbose)?;
+    
+    if cli.verbose {
+        println!("Verbose mode enabled. Logs will be printed to console.");
+    }
 
     match cli.command {
         Some(Commands::PrepareCommitMsg { commit_msg_file_path, commit_source, commit_sha1 }) => {
