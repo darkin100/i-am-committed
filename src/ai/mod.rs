@@ -66,6 +66,10 @@ impl AIClient {
 
         Ok(AIClient { client, model })
     }
+    
+    pub fn get_model(&self) -> &str {
+        &self.model
+    }
 
     pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AIError> {
         // Load and parse prompts from markdown

@@ -167,16 +167,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       "#
                 .green()
             );
-            println!("{}", VERSION);
-            println!("\n{}", "🔍 Analysing Changes...".blue());
-            println!("-----------------------------------------");
-
             let api_key = env::var("OPENAI_API_KEY").map_err(|_| {
                 "Error: OPENAI_API_KEY environment variable is not set. Please set this environment variable with your OpenAI API key to use this application."
             })?;
 
             let git_client = GitClient::new();
             let ai_client = AIClient::new(api_key)?;
+            
+            println!("v{} | Model: {}", VERSION, ai_client.get_model());
+            println!("\n{}", "🔍 Analysing Changes...".blue());
+            println!("-----------------------------------------");
 
             if !git_client.has_staged_changes()? {
                 warn!("No staged changes found.");
