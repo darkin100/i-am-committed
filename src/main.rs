@@ -119,7 +119,7 @@ async fn generate_formatted_commit_message(
     // Format the commit message
     let formatter = CommitFormatter::new(raw_message.clone());
     let formatted_commit = formatter.format();
-    let final_message = formatted_commit.to_string();
+    let final_message = format!("{}", formatted_commit);
     info!("Formatted commit message: {}", final_message);
 
     Ok(final_message)
@@ -291,7 +291,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     let formatter = CommitFormatter::new(edited_message);
                     let formatted_commit = formatter.format();
-                    formatted_commit.to_string()
+                    format!("{}", formatted_commit)
                 }
                 _ => {
                     println!("\nCommit cancelled\n");

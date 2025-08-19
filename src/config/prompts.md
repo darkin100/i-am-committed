@@ -37,8 +37,9 @@ Added functionality to the AIClient to accept a custom OpenAI endpoint through a
 
 ### Example 3
 
-feat(ai): support custom OpenAI endpoint configuration
-Added functionality to the AIClient to accept a custom OpenAI endpoint through an environment variable. This allows users to specify alternative endpoints when initializing the client. Additionally, a new test has been implemented to verify the behavior with a custom endpoint.
+chore(ci): update Rust workflow permissions and version bump
+- Added permissions section to allow write access for contents in the release job.
+- Updated package version from 0.2.0-alpha to v1.0.0 in Cargo.toml.
 
 ## User Prompt
 
@@ -47,7 +48,7 @@ Please analyze the following git diff and generate a commit message that follows
 Here is the git diff:
 
 <diff>
-{{DIFF_OUTPUT}}
+{diff}
 </diff>
 
 The message should be clear, concise, and meaningful, helping developers understand the changes made

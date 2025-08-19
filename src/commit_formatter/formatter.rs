@@ -36,7 +36,7 @@ mod tests {
     fn test_format_message() {
         let message = "feat(auth): Add login functionality";
         let formatter = CommitFormatter::new(message.to_string());
-        assert_eq!(formatter.format().to_string(), message);
+        assert_eq!(format!("{}", formatter.format()), message);
     }
 
     #[test]
@@ -44,7 +44,7 @@ mod tests {
         let message = "```feat(auth): Add login functionality```";
         let formatter = CommitFormatter::new(message.to_string());
         assert_eq!(
-            formatter.format().to_string(),
+            format!("{}", formatter.format()),
             "feat(auth): Add login functionality"
         );
     }
@@ -54,7 +54,7 @@ mod tests {
         let message = "`feat(core)`: Add new feature";
         let formatter = CommitFormatter::new(message.to_string());
         assert_eq!(
-            formatter.format().to_string(),
+            format!("{}", formatter.format()),
             "feat(core): Add new feature"
         );
     }
@@ -67,7 +67,7 @@ mod tests {
         ```";
         let formatter = CommitFormatter::new(message.to_string());
         assert_eq!(
-            formatter.format().to_string(),
+            format!("{}", formatter.format()),
             "feat(core): Add new feature
         
         added new feature"
@@ -79,7 +79,7 @@ mod tests {
         let message = "<commit_message>feat(auth): Add login functionality</commit_message>";
         let formatter = CommitFormatter::new(message.to_string());
         assert_eq!(
-            formatter.format().to_string(),
+            format!("{}", formatter.format()),
             "feat(auth): Add login functionality"
         );
     }
@@ -89,7 +89,7 @@ mod tests {
         let message = "<commit_message>`feat(core)`: Add new feature</commit_message>";
         let formatter = CommitFormatter::new(message.to_string());
         assert_eq!(
-            formatter.format().to_string(),
+            format!("{}", formatter.format()),
             "feat(core): Add new feature"
         );
     }
@@ -103,7 +103,7 @@ Added a new feature to the core module
 </commit_message>";
         let formatter = CommitFormatter::new(message.to_string());
         assert_eq!(
-            formatter.format().to_string(),
+            format!("{}", formatter.format()),
             "feat(core): Add new feature
 
 Added a new feature to the core module"
