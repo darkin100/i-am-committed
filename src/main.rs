@@ -43,8 +43,8 @@ use crate::git::GitClient;
 
 #[derive(Parser)]
 #[command(
-    author, 
-    version, 
+    author,
+    version,
     about = "An AI-powered Git commit message generator",
     long_about = "IAmCommitted uses OpenAI's API to analyze your staged changes and generate meaningful commit messages following conventional commit standards.\n\n\
                   ENVIRONMENT VARIABLES:\n\
@@ -319,20 +319,20 @@ mod tests {
     fn test_help_contains_environment_variables() {
         let mut app = Cli::command();
         let help_string = format!("{}", app.render_long_help());
-        
+
         // Check that help contains IAC-specific environment variables
         assert!(help_string.contains("IAC_OPENAI_API_KEY"));
         assert!(help_string.contains("IAC_OPENAI_MODEL"));
         assert!(help_string.contains("IAC_OPENAI_ENDPOINT"));
-        
+
         // Check that help contains standard OpenAI environment variables
         assert!(help_string.contains("OPENAI_API_KEY"));
         assert!(help_string.contains("OPENAI_MODEL"));
         assert!(help_string.contains("OPENAI_ENDPOINT"));
-        
+
         // Check that help mentions precedence
         assert!(help_string.contains("takes precedence"));
-        
+
         // Check for examples
         assert!(help_string.contains("EXAMPLES"));
     }
@@ -341,7 +341,7 @@ mod tests {
     fn test_help_contains_usage_examples() {
         let mut app = Cli::command();
         let help_string = format!("{}", app.render_long_help());
-        
+
         // Check for specific usage examples
         assert!(help_string.contains("export IAC_OPENAI_API_KEY"));
         assert!(help_string.contains("iamcommitted -v"));
@@ -352,7 +352,7 @@ mod tests {
     fn test_short_help_format() {
         let mut app = Cli::command();
         let help_string = format!("{}", app.render_help());
-        
+
         // Basic help should contain the application name and description
         assert!(help_string.contains("iamcommitted"));
         assert!(help_string.contains("AI-powered Git commit message generator"));
@@ -362,7 +362,7 @@ mod tests {
     fn test_version_info() {
         let app = Cli::command();
         let version = app.get_version().unwrap_or("unknown");
-        
+
         // Version should be set from Cargo.toml
         assert_eq!(version, "1.0.0");
     }
@@ -371,7 +371,7 @@ mod tests {
     fn test_verbose_flag_documentation() {
         let mut app = Cli::command();
         let help_string = format!("{}", app.render_help());
-        
+
         // Check that verbose flag is documented
         assert!(help_string.contains("-v"));
         assert!(help_string.contains("--verbose"));

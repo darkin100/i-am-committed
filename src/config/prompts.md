@@ -55,6 +55,7 @@ The message should be clear, concise, and meaningful, helping developers underst
 
 Format your response as follows:
 1. Write your commit message in <commit_message> tags
+2. DO NOT use any markdown formatting.
 
 <commit_message>
 
