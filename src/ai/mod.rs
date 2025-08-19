@@ -91,9 +91,9 @@ impl AIClient {
             message: format!("Failed to load prompts: {}", e),
         })?;
 
-        // Extract system prompt
+        // Extract system prompt (including examples)
         let system_re =
-            Regex::new(r"(?s)## System Prompt\n\n(.*?)\n\n##").map_err(|e| AIError {
+            Regex::new(r"(?s)## System Prompt\n\n(.*?)## User Prompt").map_err(|e| AIError {
                 message: format!("Failed to compile system prompt regex: {}", e),
             })?;
         let system_prompt = system_re
