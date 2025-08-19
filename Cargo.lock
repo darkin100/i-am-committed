@@ -624,6 +624,7 @@ dependencies = [
  "colored",
  "fern",
  "log",
+ "once_cell",
  "openai-api-rs",
  "regex",
  "tempfile",
