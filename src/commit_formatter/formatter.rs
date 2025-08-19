@@ -1,5 +1,18 @@
 use super::types::CommitType;
+use once_cell::sync::Lazy;
 use regex::Regex;
+
+// Compile regex patterns once for better performance
+static CODE_BLOCK_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?s)^\s*```(?:shell|sh|bash|plaintext|text|markdown|md)\s*\n(.*?)\n```\s*$")
+        .unwrap()
+});
+
+static SIMPLE_CODE_BLOCK_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?s)^\s*```\s*\n(.*?)\n```\s*$").unwrap());
+
+static INLINE_KEYWORD_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(?:shell|sh|bash|plaintext|text|markdown|md)\s+").unwrap());
 
 pub struct CommitFormatter {
     raw_message: String,
@@ -19,30 +32,21 @@ impl CommitFormatter {
             .replace("</commit_message>", "");
 
         // Remove markdown code blocks with language identifiers that wrap the entire message
-        // Pattern: ^```language\n...\n```$
-        let code_block_regex = Regex::new(
-            r"(?s)^\s*```(?:shell|sh|bash|plaintext|text|markdown|md)\s*\n(.*?)\n```\s*$",
-        )
-        .unwrap();
-        if let Some(captures) = code_block_regex.captures(&cleaned_message) {
+        if let Some(captures) = CODE_BLOCK_REGEX.captures(&cleaned_message) {
             if let Some(content) = captures.get(1) {
                 cleaned_message = content.as_str().to_string();
             }
         }
 
         // Also handle code blocks without language identifiers but only if they wrap the entire message
-        let simple_code_block_regex = Regex::new(r"(?s)^\s*```\s*\n(.*?)\n```\s*$").unwrap();
-        if let Some(captures) = simple_code_block_regex.captures(&cleaned_message) {
+        if let Some(captures) = SIMPLE_CODE_BLOCK_REGEX.captures(&cleaned_message) {
             if let Some(content) = captures.get(1) {
                 cleaned_message = content.as_str().to_string();
             }
         }
 
         // Remove inline language keywords at the start of the message
-        // Pattern: ^language_keyword followed by space
-        let inline_keyword_regex =
-            Regex::new(r"^(?:shell|sh|bash|plaintext|text|markdown|md)\s+").unwrap();
-        cleaned_message = inline_keyword_regex
+        cleaned_message = INLINE_KEYWORD_REGEX
             .replace(&cleaned_message, "")
             .to_string();
 
@@ -273,7 +277,10 @@ Implemented rate limiting to prevent API abuse"
         let example2 = "sh\nfeat(formatter): Update test assertions for CommitFormatter";
         let formatter2 = CommitFormatter::new(example2.to_string());
         let result2 = format!("{}", formatter2.format());
-        assert_eq!(result2, "feat(formatter): Update test assertions for CommitFormatter");
+        assert_eq!(
+            result2,
+            "feat(formatter): Update test assertions for CommitFormatter"
+        );
         assert!(!result2.starts_with("sh"));
 
         // Additional realistic examples
