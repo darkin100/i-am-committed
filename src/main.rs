@@ -42,7 +42,29 @@ use crate::config::Config;
 use crate::git::GitClient;
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    author, 
+    version, 
+    about = "An AI-powered Git commit message generator",
+    long_about = "IAmCommitted uses OpenAI's API to analyze your staged changes and generate meaningful commit messages following conventional commit standards.\n\n\
+                  ENVIRONMENT VARIABLES:\n\
+                  The application requires OpenAI API configuration through environment variables.\n\n\
+                  IAmCommitted-specific (takes precedence):\n  \
+                  IAC_OPENAI_API_KEY    - Your OpenAI API key for IAmCommitted\n  \
+                  IAC_OPENAI_MODEL      - Model to use (default: gpt-4o-mini)\n  \
+                  IAC_OPENAI_ENDPOINT   - Custom OpenAI endpoint (optional)\n\n\
+                  Standard OpenAI (fallback):\n  \
+                  OPENAI_API_KEY        - Your OpenAI API key\n  \
+                  OPENAI_MODEL          - Model to use (default: gpt-4o-mini)\n  \
+                  OPENAI_ENDPOINT       - Custom OpenAI endpoint (optional)\n\n\
+                  EXAMPLES:\n  \
+                  # Set IAmCommitted-specific API key:\n  \
+                  export IAC_OPENAI_API_KEY='your-key-here'\n\n  \
+                  # Run with verbose logging:\n  \
+                  iamcommitted -v\n\n  \
+                  # Use as git hook:\n  \
+                  iamcommitted prepare-commit-msg .git/COMMIT_EDITMSG"
+)]
 struct Cli {
     /// Enable verbose mode to print logs to console as well
     #[arg(long = "verbose", short = 'v')]
@@ -285,5 +307,74 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn test_help_contains_environment_variables() {
+        let mut app = Cli::command();
+        let help_string = format!("{}", app.render_long_help());
+        
+        // Check that help contains IAC-specific environment variables
+        assert!(help_string.contains("IAC_OPENAI_API_KEY"));
+        assert!(help_string.contains("IAC_OPENAI_MODEL"));
+        assert!(help_string.contains("IAC_OPENAI_ENDPOINT"));
+        
+        // Check that help contains standard OpenAI environment variables
+        assert!(help_string.contains("OPENAI_API_KEY"));
+        assert!(help_string.contains("OPENAI_MODEL"));
+        assert!(help_string.contains("OPENAI_ENDPOINT"));
+        
+        // Check that help mentions precedence
+        assert!(help_string.contains("takes precedence"));
+        
+        // Check for examples
+        assert!(help_string.contains("EXAMPLES"));
+    }
+
+    #[test]
+    fn test_help_contains_usage_examples() {
+        let mut app = Cli::command();
+        let help_string = format!("{}", app.render_long_help());
+        
+        // Check for specific usage examples
+        assert!(help_string.contains("export IAC_OPENAI_API_KEY"));
+        assert!(help_string.contains("iamcommitted -v"));
+        assert!(help_string.contains("prepare-commit-msg"));
+    }
+
+    #[test]
+    fn test_short_help_format() {
+        let mut app = Cli::command();
+        let help_string = format!("{}", app.render_help());
+        
+        // Basic help should contain the application name and description
+        assert!(help_string.contains("iamcommitted"));
+        assert!(help_string.contains("AI-powered Git commit message generator"));
+    }
+
+    #[test]
+    fn test_version_info() {
+        let app = Cli::command();
+        let version = app.get_version().unwrap_or("unknown");
+        
+        // Version should be set from Cargo.toml
+        assert_eq!(version, "1.0.0");
+    }
+
+    #[test]
+    fn test_verbose_flag_documentation() {
+        let mut app = Cli::command();
+        let help_string = format!("{}", app.render_help());
+        
+        // Check that verbose flag is documented
+        assert!(help_string.contains("-v"));
+        assert!(help_string.contains("--verbose"));
+        assert!(help_string.contains("verbose mode"));
     }
 }

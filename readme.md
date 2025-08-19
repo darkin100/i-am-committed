@@ -72,31 +72,49 @@ Alternatively, `cargo install --path .` will install it to your Cargo binary dir
 
 If you've installed `iamcommitted` to `/usr/local/bin` or another directory in your PATH, you can run it directly.
 
-The CLI currently uses OpenAI's API. So you will need to get your [own API key](https://platform.openai.com/) and set it as an environment variable, or as part of your vscode launch.json
+The CLI currently uses OpenAI's API. So you will need to get your [own API key](https://platform.openai.com/) and set it as an environment variable.
+
+#### Environment Variables Configuration
+
+IAmCommitted supports two sets of environment variables for OpenAI configuration:
+
+1. **IAmCommitted-specific variables (recommended)** - These take precedence if set:
+   - `IAC_OPENAI_API_KEY` - Your OpenAI API key for IAmCommitted
+   - `IAC_OPENAI_MODEL` - The model to use (defaults to `gpt-4o-mini`)
+   - `IAC_OPENAI_ENDPOINT` - Custom OpenAI endpoint (optional)
+
+2. **Standard OpenAI variables** - Used as fallback if IAC_* variables are not set:
+   - `OPENAI_API_KEY` - Your OpenAI API key
+   - `OPENAI_MODEL` - The model to use (defaults to `gpt-4o-mini`)
+   - `OPENAI_ENDPOINT` - Custom OpenAI endpoint (optional)
+
+Using the IAC_* prefixed variables allows you to have different OpenAI configurations for IAmCommitted without affecting other applications that use the standard OPENAI_* variables.
+
+##### Setting up environment variables:
 
 ```sh
-export OPENAI_API_KEY=<key>
+# Option 1: Use IAmCommitted-specific variables (recommended)
+export IAC_OPENAI_API_KEY=<your_key_for_iamcommitted>
+export IAC_OPENAI_MODEL="gpt-4o"  # Optional, defaults to gpt-4o-mini
+
+# Option 2: Use standard OpenAI variables (fallback)
+export OPENAI_API_KEY=<your_key>
+export OPENAI_MODEL="gpt-4o"  # Optional, defaults to gpt-4o-mini
 ```
 
-or update your terminal profile .zshrc file with your API Key.
+Or add them to your terminal profile (.zshrc, .bashrc, etc.):
 
 ```sh
+# Add IAmCommitted-specific configuration
+echo 'export IAC_OPENAI_API_KEY="your_api_key_here"' >> ~/.zshrc
+echo 'export IAC_OPENAI_MODEL="gpt-4o"' >> ~/.zshrc
+
+# Or use standard OpenAI variables
 echo 'export OPENAI_API_KEY="your_api_key_here"' >> ~/.zshrc
-```
-
-You can also specify which OpenAI model to use by setting the `OPENAI_MODEL` environment variable. If not specified, it defaults to `gpt-4o-mini`.
-
-```sh
-export OPENAI_MODEL="gpt-4o"  # Use GPT-4o instead of the default
-```
-
-or add it to your terminal profile:
-
-```sh
 echo 'export OPENAI_MODEL="gpt-4o"' >> ~/.zshrc
 ```
 
-Supported models include:
+##### Supported models include:
 
 - `gpt-4o-mini` (default)
 - `gpt-4o`
@@ -166,7 +184,7 @@ Once installed, the hook will automatically run when you execute `git commit`.
 - If you run `git commit` without `-m` or a template, `i-am-committed` will generate a message and write it to the commit message file. Your editor will then open with this pre-filled message.
 - If you use `git commit -m "Your message"` or have a commit template configured, `i-am-committed` will not overwrite your message or template.
 
-You still need to have your `OPENAI_API_KEY` environment variable set for the hook to function correctly. The `OPENAI_MODEL` environment variable will also be respected by the hook if set.
+You still need to have your OpenAI API key configured for the hook to function correctly. You can use either `IAC_OPENAI_API_KEY` (recommended) or `OPENAI_API_KEY`. The model selection (`IAC_OPENAI_MODEL` or `OPENAI_MODEL`) will also be respected by the hook if set.
 
 ## Unit Tests
 
