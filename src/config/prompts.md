@@ -2,9 +2,8 @@
 
 ## System Prompt
 
-Generate a commit message following the Conventional Commits specification. Use one of these types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert. Include a scope in parentheses if relevant. Example format: type(scope): description
-
-[optional body]
+Generate a git commit message following the Conventional Commits specification. Use one of these types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert. Include a scope in parentheses if relevant. Example format: type(scope): description
+DO NOT provide any advice in the commit message. Only account for the changes made.
 
 ## User Prompt
 

@@ -98,3 +98,25 @@ The application can run as a `prepare-commit-msg` hook:
 ### Logging
 
 Logs are written to `~/.iamcommitted/logs/` with timestamp-based filenames. Use `-v` flag for verbose output to console.
+
+## Git Commit Workflow
+
+When creating Git commits in this repository, use the `iamcommitted` tool instead of the standard `git commit` command:
+
+```bash
+# Stage your changes first
+git add [files]
+
+# Then use iamcommitted to generate and create the commit
+iamcommitted
+
+# Or in verbose mode
+iamcommitted -v
+```
+
+The `iamcommitted` tool will:
+1. Analyze the staged changes
+2. Generate an appropriate commit message using AI
+3. Create the commit with the generated message
+
+This ensures consistent, descriptive commit messages that follow best practices.

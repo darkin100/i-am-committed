@@ -72,54 +72,65 @@ Alternatively, `cargo install --path .` will install it to your Cargo binary dir
 
 If you've installed `iamcommitted` to `/usr/local/bin` or another directory in your PATH, you can run it directly.
 
-The CLI currently uses OpenAI's API. So you will need to get your [own API key](https://platform.openai.com/) and set it as an environment variable.
+The CLI supports any OpenAI compliant model provider such as [OpenRouter](https://openrouter.ai/). You will need to configure your chosen provider with the appropriate API key and endpoint.
 
 #### Environment Variables Configuration
 
-IAmCommitted supports two sets of environment variables for OpenAI configuration:
+IAmCommitted supports two sets of environment variables for API configuration:
 
 1. **IAmCommitted-specific variables (recommended)** - These take precedence if set:
-   - `IAC_OPENAI_API_KEY` - Your OpenAI API key for IAmCommitted
+   - `IAC_OPENAI_API_KEY` - Your API key for IAmCommitted
    - `IAC_OPENAI_MODEL` - The model to use (defaults to `gpt-4o-mini`)
-   - `IAC_OPENAI_ENDPOINT` - Custom OpenAI endpoint (optional)
+   - `IAC_OPENAI_ENDPOINT` - Custom API endpoint (optional, useful for OpenRouter)
 
 2. **Standard OpenAI variables** - Used as fallback if IAC_* variables are not set:
-   - `OPENAI_API_KEY` - Your OpenAI API key
+   - `OPENAI_API_KEY` - Your API key
    - `OPENAI_MODEL` - The model to use (defaults to `gpt-4o-mini`)
-   - `OPENAI_ENDPOINT` - Custom OpenAI endpoint (optional)
+   - `OPENAI_ENDPOINT` - Custom API endpoint (optional, useful for OpenRouter)
 
-Using the IAC_* prefixed variables allows you to have different OpenAI configurations for IAmCommitted without affecting other applications that use the standard OPENAI_* variables.
+Using the IAC_* prefixed variables allows you to have different API configurations for IAmCommitted without affecting other applications that use the standard OPENAI_* variables.
 
-##### Setting up environment variables:
+##### Option 1: Using OpenAI (default)
 
 ```sh
-# Option 1: Use IAmCommitted-specific variables (recommended)
-export IAC_OPENAI_API_KEY=<your_key_for_iamcommitted>
-export IAC_OPENAI_MODEL="gpt-4o"  # Optional, defaults to gpt-4o-mini
 
-# Option 2: Use standard OpenAI variables (fallback)
-export OPENAI_API_KEY=<your_key>
+# use standard OpenAI variables
+export OPENAI_API_KEY=<your_openai_api_key>
 export OPENAI_MODEL="gpt-4o"  # Optional, defaults to gpt-4o-mini
 ```
 
-Or add them to your terminal profile (.zshrc, .bashrc, etc.):
+##### Option 2: Using OpenRouter (free option available)
+
+[OpenRouter](https://openrouter.ai) provides access to various AI models through a unified API. The Mistral Devstral model (`mistralai/devstral-small-2505`) offers adequate performance for commit message generation and is **free to use**.
 
 ```sh
-# Add IAmCommitted-specific configuration
-echo 'export IAC_OPENAI_API_KEY="your_api_key_here"' >> ~/.zshrc
-echo 'export IAC_OPENAI_MODEL="gpt-4o"' >> ~/.zshrc
+# Get your API key from https://openrouter.ai/keys
+export IAC_OPENAI_API_KEY=<your_openrouter_api_key>
+export IAC_OPENAI_ENDPOINT="https://openrouter.ai/api/v1"
+export IAC_OPENAI_MODEL="mistralai/devstral-small-2505"  # Free model
 
-# Or use standard OpenAI variables
-echo 'export OPENAI_API_KEY="your_api_key_here"' >> ~/.zshrc
-echo 'export OPENAI_MODEL="gpt-4o"' >> ~/.zshrc
 ```
 
-##### Supported models include:
+Other OpenRouter models you can use (check [OpenRouter](https://openrouter.ai/models) for pricing):
+- `openai/gpt-4o-mini` - Same as OpenAI's gpt-4o-mini
+- `anthropic/claude-3.5-sonnet` - Claude 3.5 Sonnet
+- `google/gemini-flash-1.5` - Google's Gemini Flash
+- `meta-llama/llama-3.1-8b-instruct` - Llama 3.1 8B
 
-- `gpt-4o-mini` (default)
-- `gpt-4o`
-- `gpt-3.5-turbo`
-- `gpt-4-turbo`
+##### Adding to your terminal profile
+
+Add your chosen configuration to your terminal profile (.zshrc, .bashrc, etc.):
+
+```sh
+# For OpenAI
+echo 'export OPENAI_API_KEY="your_openai_key_here"' >> ~/.zshrc
+echo 'export OPENAI_MODEL="gpt-4o-mini"' >> ~/.zshrc
+
+# For OpenRouter (free option)
+echo 'export IAC_OPENAI_API_KEY="your_openrouter_key_here"' >> ~/.zshrc
+echo 'export IAC_OPENAI_ENDPOINT="https://openrouter.ai/api/v1"' >> ~/.zshrc
+echo 'export IAC_OPENAI_MODEL="mistralai/devstral-small-2505"' >> ~/.zshrc
+```
 
 To execute the command, its as simple as:
 
@@ -184,7 +195,7 @@ Once installed, the hook will automatically run when you execute `git commit`.
 - If you run `git commit` without `-m` or a template, `i-am-committed` will generate a message and write it to the commit message file. Your editor will then open with this pre-filled message.
 - If you use `git commit -m "Your message"` or have a commit template configured, `i-am-committed` will not overwrite your message or template.
 
-You still need to have your OpenAI API key configured for the hook to function correctly. You can use either `IAC_OPENAI_API_KEY` (recommended) or `OPENAI_API_KEY`. The model selection (`IAC_OPENAI_MODEL` or `OPENAI_MODEL`) will also be respected by the hook if set.
+You still need to have your API key configured for the hook to function correctly. You can use either `IAC_OPENAI_API_KEY` (recommended) or `OPENAI_API_KEY`. The model selection (`IAC_OPENAI_MODEL` or `OPENAI_MODEL`) and endpoint (`IAC_OPENAI_ENDPOINT` or `OPENAI_ENDPOINT`) will also be respected by the hook if set. This works with both OpenAI and OpenRouter configurations.
 
 ## Unit Tests
 
