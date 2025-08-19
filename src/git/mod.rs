@@ -1,6 +1,6 @@
+use colored::*;
 use std::process::Command;
 use std::process::Output;
-use colored::*;
 
 pub struct GitClient {
     working_dir: Option<String>,
@@ -24,9 +24,9 @@ impl GitClient {
         GitClient { working_dir: None }
     }
 
-    pub fn with_working_dir(working_dir: String) -> Self {
+    pub fn with_working_dir(dir: String) -> Self {
         GitClient {
-            working_dir: Some(working_dir),
+            working_dir: Some(dir),
         }
     }
 
@@ -51,13 +51,13 @@ impl GitClient {
 
     fn run_git_command(&self, args: &[&str]) -> Result<Output, GitError> {
         let mut command = Command::new("git");
-        
+
         if let Some(dir) = &self.working_dir {
             command.current_dir(dir);
         }
-        
+
         command.args(args);
-        
+
         command.output().map_err(|e| GitError {
             message: format!("Git command failed: {}", e),
         })
@@ -109,15 +109,16 @@ mod tests {
 
     fn setup_test_repo() -> TempDir {
         let temp_dir = TempDir::new().unwrap();
-        let git_client = GitClient::with_working_dir(temp_dir.path().to_string_lossy().to_string());
-        
+        let _git_client =
+            GitClient::with_working_dir(temp_dir.path().to_string_lossy().to_string());
+
         // Initialize git repo
         Command::new("git")
             .args(&["init"])
             .current_dir(temp_dir.path())
             .output()
             .unwrap();
-            
+
         // Configure git user for commits
         Command::new("git")
             .args(&["config", "user.name", "Test User"])
@@ -137,7 +138,7 @@ mod tests {
     fn test_has_staged_changes_with_no_changes() {
         let temp_dir = setup_test_repo();
         let git_client = GitClient::with_working_dir(temp_dir.path().to_string_lossy().to_string());
-        
+
         assert!(!git_client.has_staged_changes().unwrap());
     }
 
@@ -145,18 +146,18 @@ mod tests {
     fn test_has_staged_changes_with_changes() {
         let temp_dir = setup_test_repo();
         let git_client = GitClient::with_working_dir(temp_dir.path().to_string_lossy().to_string());
-        
+
         // Create and stage a test file
         let test_file_path = temp_dir.path().join("test.txt");
         let mut file = File::create(&test_file_path).unwrap();
         writeln!(file, "test content").unwrap();
-        
+
         Command::new("git")
             .args(&["add", "test.txt"])
             .current_dir(temp_dir.path())
             .output()
             .unwrap();
-            
+
         assert!(git_client.has_staged_changes().unwrap());
     }
 
@@ -164,21 +165,21 @@ mod tests {
     fn test_get_staged_files() {
         let temp_dir = setup_test_repo();
         let git_client = GitClient::with_working_dir(temp_dir.path().to_string_lossy().to_string());
-        
+
         // Create and stage multiple test files
         let files = vec!["test1.txt", "test2.txt"];
         for file_name in &files {
             let test_file_path = temp_dir.path().join(file_name);
             let mut file = File::create(&test_file_path).unwrap();
             writeln!(file, "test content").unwrap();
-            
+
             Command::new("git")
                 .args(&["add", file_name])
                 .current_dir(temp_dir.path())
                 .output()
                 .unwrap();
         }
-        
+
         let staged_files = git_client.get_staged_files().unwrap();
         for file_name in &files {
             assert!(staged_files.contains(file_name));
@@ -189,21 +190,21 @@ mod tests {
     fn test_commit() {
         let temp_dir = setup_test_repo();
         let git_client = GitClient::with_working_dir(temp_dir.path().to_string_lossy().to_string());
-        
+
         // Create and stage a test file
         let test_file_path = temp_dir.path().join("test.txt");
         let mut file = File::create(&test_file_path).unwrap();
         writeln!(file, "test content").unwrap();
-        
+
         Command::new("git")
             .args(&["add", "test.txt"])
             .current_dir(temp_dir.path())
             .output()
             .unwrap();
-            
+
         let commit_result = git_client.commit("test commit");
         assert!(commit_result.is_ok());
-        
+
         // Verify commit was created
         let log_output = Command::new("git")
             .args(&["log", "--oneline"])
