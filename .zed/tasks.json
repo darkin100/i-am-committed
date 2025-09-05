@@ -1,0 +1,74 @@
+[
+  {
+    "label": "Build Debug",
+    "command": "cargo",
+    "args": ["build"],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "on_success",
+    "shell": "system",
+    "tags": ["build", "debug"]
+  },
+  {
+    "label": "Build Release",
+    "command": "cargo",
+    "args": ["build", "--release"],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "on_success",
+    "shell": "system",
+    "tags": ["build", "release"]
+  },
+  {
+    "label": "Build Both (Debug + Release)",
+    "command": "cargo",
+    "args": ["build", "&&", "cargo", "build", "--release"],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "on_success",
+    "shell": "system",
+    "tags": ["build", "all"]
+  },
+  {
+    "label": "Test",
+    "command": "cargo",
+    "args": ["test"],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "on_success",
+    "shell": "system",
+    "tags": ["test"]
+  },
+  {
+    "label": "Format Code",
+    "command": "cargo",
+    "args": ["fmt"],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "on_success",
+    "shell": "system",
+    "tags": ["format"]
+  },
+  {
+    "label": "Run Clippy",
+    "command": "cargo",
+    "args": ["clippy"],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "on_success",
+    "shell": "system",
+    "tags": ["lint"]
+  }
+]
