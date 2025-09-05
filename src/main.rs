@@ -57,6 +57,18 @@ use crate::git::GitClient;
                   OPENAI_API_KEY        - Your OpenAI API key\n  \
                   OPENAI_MODEL          - Model to use (default: gpt-4o-mini)\n  \
                   OPENAI_ENDPOINT       - Custom OpenAI endpoint (optional)\n\n\
+                  CONFIGURATION DIRECTORY:\n\
+                  IAmCommitted stores configuration files in platform-specific directories:\n\n\
+                  Linux/Unix: ~/.config/iamcommitted/ (or $XDG_CONFIG_HOME/iamcommitted/)\n  \
+                  macOS:      ~/Library/Application Support/iamcommitted/\n  \
+                  Windows:    %USERPROFILE%\\AppData\\Roaming\\iamcommitted\\\n\n\
+                  Configuration files:\n  \
+                  prompts.md            - AI prompts used for commit message generation\n                           \
+                  (created automatically with defaults on first run)\n\n\
+                  Logs are stored separately in:\n  \
+                  Linux/Unix: ~/.local/state/iamcommitted/logs/ (or $XDG_STATE_HOME/iamcommitted/logs/)\n  \
+                  macOS:      ~/Library/Logs/iamcommitted/\n  \
+                  Windows:    %USERPROFILE%\\AppData\\Local\\iamcommitted\\logs\\\n\n\
                   EXAMPLES:\n  \
                   # Set IAmCommitted-specific API key:\n  \
                   export IAC_OPENAI_API_KEY='your-key-here'\n\n  \
@@ -202,7 +214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /  _/ ___ ___ _    / ___/__  __ _  __ _  (_) /_/ /____ ___/ /
    _/ /  / _ `/  ' \  / /__/ _ \/  ' \/  ' \/ / __/ __/ -_) _  /
   /___/  \_,_/_/_/_/  \___/\___/_/_/_/_/_/_/_/\__/\__/\__/\_,_/
-                                                                 
+
       "#
                 .green()
             );
