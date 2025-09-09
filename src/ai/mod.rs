@@ -35,7 +35,10 @@ impl From<Box<dyn std::error::Error>> for AIError {
 
 impl AIClient {
     pub fn new(api_key: String, config: Config) -> Result<Self, AIError> {
-        let mut builder = OpenAIClient::builder().with_api_key(api_key);
+        let mut builder = OpenAIClient::builder()
+            .with_api_key(api_key)
+            .with_header("X-Title", "IAmCommitted")
+            .with_header("Referer", "https://iamcommitted.glyndarkin.co.uk/");
 
         // Check for custom endpoint - IAC_OPENAI_ENDPOINT takes precedence over OPENAI_ENDPOINT
         let custom_endpoint =
