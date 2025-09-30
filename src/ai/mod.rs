@@ -284,10 +284,12 @@ pub struct AgentResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::env;
     use tokio;
 
     #[tokio::test]
+    #[serial]
     async fn test_generate_commit_message() {
         // This test requires a valid OpenAI API key in the environment
         // It's an integration test and may be skipped in CI/CD if API key is not available
@@ -327,6 +329,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_new_client_with_invalid_key() {
         // Clean environment at the start to avoid pollution from other tests
         env::remove_var("IAC_OPENAI_MODEL");
@@ -361,6 +364,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_iac_openai_model_precedence() {
         // Clean environment at the start to avoid pollution from other tests
         env::remove_var("IAC_OPENAI_MODEL");
