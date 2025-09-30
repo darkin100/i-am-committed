@@ -19,7 +19,7 @@ fn setup_logging(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
             ))
         })
         .level(log::LevelFilter::Info)
-        .chain(fern::log_file(log_dir.join("chatgpt_interactions.log"))?);
+        .chain(fern::log_file(log_dir.join("interactions.log"))?);
 
     // If verbose mode is enabled, also log to stdout
     if verbose {
@@ -111,25 +111,10 @@ async fn generate_formatted_commit_message(
     git_client: &GitClient,
     ai_client: &AIClient,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    // Get the full diff for AI processing
-    let diff = git_client.get_staged_changes()?;
-    info!(
-        "Retrieved diff for AI processing (first 500 chars):\n{}",
-        diff.chars().take(500).collect::<String>()
-    );
-
-    if diff.trim().is_empty() {
-        let staged_files_list = git_client.get_staged_files()?;
-        if staged_files_list.trim().is_empty() {
-            warn!("Diff is empty and no staged files. AI will process an empty context.");
-        } else {
-            warn!("Diff is empty, but staged files are present (e.g. mode changes, new empty files). AI will process based on file list if prompt supports it.");
-        }
-    }
-
     // Use agent for agentic workflow with tool calling
+    // The agent will call get_staged_changes tool itself
     let agent = Agent::new(ai_client, git_client);
-    let raw_message = agent.generate_commit_message(&diff).await?;
+    let raw_message = agent.generate_commit_message().await?;
     info!("Raw AI-generated message: {}", raw_message);
 
     // Format the commit message
@@ -283,8 +268,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let num = num_result.unwrap();
             let final_message = match num {
-                1 => commit_message,
+                1 => {
+                    info!("SUCCESS - User accepted AI-generated commit message");
+                    commit_message
+                },
                 2 => {
+                    info!("FAILURE - User chose to edit commit message manually");
                     // Edit commit message using nano
                     // Note: std::fs is already imported at the top level
                     use tempfile::NamedTempFile; // Keep this local as it's specific to this block
@@ -310,6 +299,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     format!("{}", formatted_commit)
                 }
                 _ => {
+                    info!("FAILURE - User cancelled commit");
                     println!("\nCommit cancelled\n");
                     return Ok(());
                 }

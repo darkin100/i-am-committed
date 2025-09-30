@@ -33,6 +33,7 @@ impl<'a> ToolExecutor<'a> {
             "get_commit_history" => self.get_commit_history(arguments),
             "list_staged_files" => self.list_staged_files(),
             "get_branch_name" => self.get_branch_name(),
+            "get_staged_changes" => self.get_staged_changes(),
             _ => Err(ToolExecutionError {
                 message: format!("Unknown tool: {}", tool_name),
             }),
@@ -98,6 +99,14 @@ impl<'a> ToolExecutor<'a> {
             .get_current_branch()
             .map_err(|e| ToolExecutionError {
                 message: format!("Failed to get branch name: {}", e),
+            })
+    }
+
+    fn get_staged_changes(&self) -> Result<String, ToolExecutionError> {
+        self.git_client
+            .get_staged_changes()
+            .map_err(|e| ToolExecutionError {
+                message: format!("Failed to get staged changes: {}", e),
             })
     }
 }

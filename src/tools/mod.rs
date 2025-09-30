@@ -109,5 +109,17 @@ pub fn get_tool_definitions() -> Vec<Tool> {
                 },
             },
         },
+        Tool {
+            r#type: ToolType::Function,
+            function: Function {
+                name: "get_staged_changes".to_string(),
+                description: Some("Get the complete git diff of all staged changes. This is the primary tool to understand what changes are being committed. Call this first to see the full context of the changes.".to_string()),
+                parameters: FunctionParameters {
+                    schema_type: JSONSchemaType::Object,
+                    properties: Some(HashMap::new()),
+                    required: None,
+                },
+            },
+        },
     ]
 }

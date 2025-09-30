@@ -164,7 +164,6 @@ impl AIClient {
 
     pub async fn generate_commit_message_with_tools(
         &self,
-        diff: &str,
         mut conversation_history: Vec<ChatCompletionMessage>,
     ) -> Result<AgentResponse, AIError> {
         // Load and parse prompts from config
@@ -209,7 +208,7 @@ impl AIClient {
 
             let user_message = chat_completion::ChatCompletionMessage {
                 role: MessageRole::user,
-                content: Content::Text(user_prompt.replace("{diff}", diff)),
+                content: Content::Text(user_prompt.to_string()),
                 name: None,
                 tool_calls: None,
                 tool_call_id: None,
@@ -236,6 +235,8 @@ impl AIClient {
 
         info!("AI Response - Has content: {}, Has tool calls: {}",
             content.is_some(), tool_calls.is_some());
+        info!("Token Usage - Prompt: {}, Completion: {}, Total: {}",
+            result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens);
 
         Ok(AgentResponse {
             content,
@@ -265,6 +266,8 @@ impl AIClient {
 
         info!("AI Response - Has content: {}, Has tool calls: {}",
             content.is_some(), tool_calls.is_some());
+        info!("Token Usage - Prompt: {}, Completion: {}, Total: {}",
+            result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens);
 
         Ok(AgentResponse {
             content,

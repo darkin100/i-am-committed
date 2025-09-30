@@ -37,16 +37,16 @@ impl<'a> Agent<'a> {
         self
     }
 
-    pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AgentError> {
+    pub async fn generate_commit_message(&self) -> Result<String, AgentError> {
         info!("Starting agent loop for commit message generation");
 
         let mut conversation_history: Vec<ChatCompletionMessage> = Vec::new();
         let tool_executor = ToolExecutor::new(self.git_client);
 
-        // Initial request with diff
+        // Initial request - LLM will call get_staged_changes tool
         let response = self
             .ai_client
-            .generate_commit_message_with_tools(diff, conversation_history.clone())
+            .generate_commit_message_with_tools(conversation_history.clone())
             .await
             .map_err(|e| AgentError {
                 message: format!("Failed to generate commit message: {}", e),

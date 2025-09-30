@@ -1,4 +1,5 @@
 use colored::*;
+use log::info;
 use std::process::Command;
 use std::process::Output;
 
@@ -25,31 +26,59 @@ impl GitClient {
     }
 
     pub fn with_working_dir(dir: String) -> Self {
-        GitClient {
+        info!("GitClient::with_working_dir called with dir: {}", dir);
+        let client = GitClient {
             working_dir: Some(dir),
-        }
+        };
+        info!("GitClient::with_working_dir completed");
+        client
     }
 
     pub fn get_staged_changes(&self) -> Result<String, GitError> {
+        info!("GitClient::get_staged_changes called");
         let output = self.run_git_command(&["diff", "--cached", "--diff-algorithm=minimal"])?;
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let result = String::from_utf8_lossy(&output.stdout).to_string();
+        info!("GitClient::get_staged_changes completed:\n{}", result);
+        Ok(result)
     }
 
     pub fn get_staged_files(&self) -> Result<String, GitError> {
+        info!("GitClient::get_staged_files called");
         let output = self.run_git_command(&["diff", "--cached", "--name-only"])?;
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let result = String::from_utf8_lossy(&output.stdout).to_string();
+        info!(
+            "GitClient::get_staged_files completed - {} files",
+            result.lines().count()
+        );
+        Ok(result)
     }
 
     pub fn has_staged_changes(&self) -> Result<bool, GitError> {
+        info!("GitClient::has_staged_changes called");
         let changes = self.get_staged_changes()?;
-        Ok(!changes.is_empty())
+        let result = !changes.is_empty();
+        info!(
+            "GitClient::has_staged_changes completed - has changes: {}",
+            result
+        );
+        Ok(result)
     }
 
     pub fn commit(&self, message: &str) -> Result<Output, GitError> {
-        self.run_git_command(&["commit", "-m", message])
+        info!("GitClient::commit called with message: {}", message);
+        let result = self.run_git_command(&["commit", "-m", message]);
+        match &result {
+            Ok(output) => info!(
+                "GitClient::commit completed - success: {}",
+                output.status.success()
+            ),
+            Err(e) => info!("GitClient::commit failed - error: {}", e),
+        }
+        result
     }
 
     fn run_git_command(&self, args: &[&str]) -> Result<Output, GitError> {
+        info!("GitClient::run_git_command called with args: {:?}", args);
         let mut command = Command::new("git");
 
         if let Some(dir) = &self.working_dir {
@@ -58,25 +87,54 @@ impl GitClient {
 
         command.args(args);
 
-        command.output().map_err(|e| GitError {
+        let result = command.output().map_err(|e| GitError {
             message: format!("Git command failed: {}", e),
-        })
+        });
+
+        match &result {
+            Ok(output) => info!(
+                "GitClient::run_git_command completed - status: {}, stdout len: {}, stderr len: {}",
+                output.status,
+                output.stdout.len(),
+                output.stderr.len()
+            ),
+            Err(e) => info!("GitClient::run_git_command failed - error: {}", e),
+        }
+
+        result
     }
 
     pub fn get_current_branch(&self) -> Result<String, GitError> {
+        info!("GitClient::get_current_branch called");
         let output = self.run_git_command(&["rev-parse", "--abbrev-ref", "HEAD"])?;
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        info!(
+            "GitClient::get_current_branch completed - branch: {}",
+            result
+        );
+        Ok(result)
     }
 
     pub fn get_commit_hash(&self) -> Result<String, GitError> {
+        info!("GitClient::get_commit_hash called");
         let output = self.run_git_command(&["rev-parse", "--short", "HEAD"])?;
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        info!("GitClient::get_commit_hash completed - hash: {}", result);
+        Ok(result)
     }
 
     pub fn commit_with_details(&self, commit_message: &str) -> Result<(), GitError> {
+        info!(
+            "GitClient::commit_with_details called with message: {}",
+            commit_message
+        );
         let output = self.commit(commit_message)?;
 
         if !output.status.success() {
+            info!(
+                "GitClient::commit_with_details - commit failed with status: {}",
+                output.status
+            );
             println!(
                 "{} {}",
                 "Failed to commit changes. Exit status:".red(),
@@ -96,35 +154,79 @@ impl GitClient {
         println!("-----------------------------------------");
         println!("🎉 All done! Keep up the great work!\n");
 
+        info!(
+            "GitClient::commit_with_details completed - branch: {}, commit: {}",
+            branch, commit
+        );
         Ok(())
     }
 
     pub fn get_file_content(&self, file_path: &str) -> Result<String, GitError> {
+        info!(
+            "GitClient::get_file_content called with file_path: {}",
+            file_path
+        );
         let output = self.run_git_command(&["show", &format!(":{}", file_path)])?;
 
         if !output.status.success() {
-            return Err(GitError {
-                message: format!("Failed to get file content: {}", String::from_utf8_lossy(&output.stderr)),
-            });
+            let error = GitError {
+                message: format!(
+                    "Failed to get file content: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ),
+            };
+            info!("GitClient::get_file_content failed - error: {}", error);
+            return Err(error);
         }
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let result = String::from_utf8_lossy(&output.stdout).to_string();
+        info!(
+            "GitClient::get_file_content completed - content length: {} chars",
+            result.len()
+        );
+        Ok(result)
     }
 
     pub fn get_file_diff(&self, file_path: &str) -> Result<String, GitError> {
-        let output = self.run_git_command(&["diff", "--cached", "--diff-algorithm=minimal", file_path])?;
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        info!(
+            "GitClient::get_file_diff called with file_path: {}",
+            file_path
+        );
+        let output =
+            self.run_git_command(&["diff", "--cached", "--diff-algorithm=minimal", file_path])?;
+        let result = String::from_utf8_lossy(&output.stdout).to_string();
+        info!(
+            "GitClient::get_file_diff completed - diff length: {} chars",
+            result.len()
+        );
+        Ok(result)
     }
 
     pub fn get_commit_history(&self, count: usize) -> Result<String, GitError> {
+        info!("GitClient::get_commit_history called with count: {}", count);
         let count_str = count.to_string();
-        let output = self.run_git_command(&["log", &format!("-{}", count_str), "--pretty=format:%h - %s (%an, %ar)"])?;
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let output = self.run_git_command(&[
+            "log",
+            &format!("-{}", count_str),
+            "--pretty=format:%h - %s (%an, %ar)",
+        ])?;
+        let result = String::from_utf8_lossy(&output.stdout).to_string();
+        info!(
+            "GitClient::get_commit_history completed - {} commits returned",
+            result.lines().count()
+        );
+        Ok(result)
     }
 
     pub fn list_staged_files_with_status(&self) -> Result<String, GitError> {
+        info!("GitClient::list_staged_files_with_status called");
         let output = self.run_git_command(&["diff", "--cached", "--name-status"])?;
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let result = String::from_utf8_lossy(&output.stdout).to_string();
+        info!(
+            "GitClient::list_staged_files_with_status completed - {} files",
+            result.lines().count()
+        );
+        Ok(result)
     }
 }
 
