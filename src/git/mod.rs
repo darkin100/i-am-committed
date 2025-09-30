@@ -98,6 +98,34 @@ impl GitClient {
 
         Ok(())
     }
+
+    pub fn get_file_content(&self, file_path: &str) -> Result<String, GitError> {
+        let output = self.run_git_command(&["show", &format!(":{}", file_path)])?;
+
+        if !output.status.success() {
+            return Err(GitError {
+                message: format!("Failed to get file content: {}", String::from_utf8_lossy(&output.stderr)),
+            });
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
+    pub fn get_file_diff(&self, file_path: &str) -> Result<String, GitError> {
+        let output = self.run_git_command(&["diff", "--cached", "--diff-algorithm=minimal", file_path])?;
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
+    pub fn get_commit_history(&self, count: usize) -> Result<String, GitError> {
+        let count_str = count.to_string();
+        let output = self.run_git_command(&["log", &format!("-{}", count_str), "--pretty=format:%h - %s (%an, %ar)"])?;
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
+    pub fn list_staged_files_with_status(&self) -> Result<String, GitError> {
+        let output = self.run_git_command(&["diff", "--cached", "--name-status"])?;
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
 }
 
 #[cfg(test)]

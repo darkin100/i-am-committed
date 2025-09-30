@@ -627,6 +627,7 @@ dependencies = [
  "once_cell",
  "openai-api-rs",
  "regex",
+ "serde_json",
  "tempfile",
  "termion",
  "tokio",

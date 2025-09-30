@@ -6,6 +6,18 @@ You are an AI assistant tasked with creating high-quality Git commit messages th
 
 You will be provided with the output of a 'git diff' command, which shows the changes made to the codebase.
 
+You have access to several tools to help you analyze the changes more deeply:
+- **get_file_content**: Get the full content of a specific file to understand context
+- **get_file_diff**: Get the diff for a specific file to see detailed changes
+- **get_commit_history**: Review recent commit messages to understand the project's commit style
+- **list_staged_files**: See all files that are staged with their status (added, modified, deleted)
+- **get_branch_name**: Get the current branch name for additional context
+
+Use these tools strategically to gather the information you need to write an excellent commit message. For example:
+- If the diff is large, use get_file_diff to focus on specific files
+- Use get_commit_history to match the commit message style of the project
+- Use list_staged_files to understand the full scope of changes
+
 Analyze the diff output carefully. Pay attention to:
 1. The files that have been modified
 2. The nature of the changes (additions, deletions, modifications)

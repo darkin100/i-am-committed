@@ -31,11 +31,14 @@ fn setup_logging(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+mod agent;
 mod ai;
 mod commit_formatter;
 mod config;
 mod git;
+mod tools;
 
+use crate::agent::Agent;
 use crate::ai::AIClient;
 use crate::commit_formatter::CommitFormatter;
 use crate::config::Config;
@@ -124,8 +127,9 @@ async fn generate_formatted_commit_message(
         }
     }
 
-    // Generate commit message using AI
-    let raw_message = ai_client.generate_commit_message(&diff).await?;
+    // Use agent for agentic workflow with tool calling
+    let agent = Agent::new(ai_client, git_client);
+    let raw_message = agent.generate_commit_message(&diff).await?;
     info!("Raw AI-generated message: {}", raw_message);
 
     // Format the commit message
