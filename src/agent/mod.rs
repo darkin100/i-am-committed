@@ -37,19 +37,82 @@ impl<'a> Agent<'a> {
         self
     }
 
+    async fn build_initial_conversation_history(&self) -> Result<Vec<ChatCompletionMessage>, AgentError> {
+        // Load prompts and build the initial conversation with system and user messages
+        use crate::config::Config;
+        use regex::Regex;
+
+        let config = Config::new().map_err(|e| AgentError {
+            message: format!("Failed to create config: {}", e),
+        })?;
+
+        let prompts_md = config.load_prompts().map_err(|e| AgentError {
+            message: format!("Failed to load prompts: {}", e),
+        })?;
+
+        // Extract system prompt
+        let system_re = Regex::new(r"(?s)## System Prompt\n\n(.*?)## User Prompt").map_err(|e| AgentError {
+            message: format!("Failed to compile system prompt regex: {}", e),
+        })?;
+        let system_prompt = system_re
+            .captures(&prompts_md)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().trim())
+            .ok_or_else(|| AgentError {
+                message: "Failed to extract system prompt from markdown".to_string(),
+            })?;
+
+        // Extract user prompt
+        let user_re = Regex::new(r"(?s)## User Prompt\n\n(.*)$").map_err(|e| AgentError {
+            message: format!("Failed to compile user prompt regex: {}", e),
+        })?;
+        let user_prompt = user_re
+            .captures(&prompts_md)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().trim())
+            .ok_or_else(|| AgentError {
+                message: "Failed to extract user prompt from markdown".to_string(),
+            })?;
+
+        let system_message = ChatCompletionMessage {
+            role: MessageRole::system,
+            content: Content::Text(system_prompt.to_string()),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        };
+
+        let user_message = ChatCompletionMessage {
+            role: MessageRole::user,
+            content: Content::Text(user_prompt.to_string()),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        };
+
+        Ok(vec![system_message, user_message])
+    }
+
     pub async fn generate_commit_message(&self) -> Result<String, AgentError> {
         info!("Starting agent loop for commit message generation");
 
-        let mut conversation_history: Vec<ChatCompletionMessage> = Vec::new();
         let tool_executor = ToolExecutor::new(self.git_client);
 
         // Initial request - LLM will call get_staged_changes tool
+        // Pass empty conversation history, AI client will add system/user prompts
         let response = self
             .ai_client
-            .generate_commit_message_with_tools(conversation_history.clone())
+            .generate_commit_message_with_tools(Vec::new())
             .await
             .map_err(|e| AgentError {
                 message: format!("Failed to generate commit message: {}", e),
+            })?;
+
+        // Build conversation history from the response
+        // We need to reconstruct the full conversation including system and user prompts
+        let mut conversation_history = self.build_initial_conversation_history().await
+            .map_err(|e| AgentError {
+                message: format!("Failed to build conversation history: {}", e),
             })?;
 
         // Add assistant's response to history
