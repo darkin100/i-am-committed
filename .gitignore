@@ -12,8 +12,6 @@ Cargo.toml.orig
 # Output of 'cargo doc'
 /doc/
 
-/tests/
-
 # Binaries
 *.exe
 *.exe~
