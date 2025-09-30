@@ -89,79 +89,6 @@ impl AIClient {
         &self.model
     }
 
-    pub async fn generate_commit_message(&self, diff: &str) -> Result<String, AIError> {
-        // Load and parse prompts from config
-        let prompts_md = self.config.load_prompts().map_err(|e| AIError {
-            message: format!("Failed to load prompts: {}", e),
-        })?;
-
-        // Extract system prompt (including examples)
-        let system_re =
-            Regex::new(r"(?s)## System Prompt\n\n(.*?)## User Prompt").map_err(|e| AIError {
-                message: format!("Failed to compile system prompt regex: {}", e),
-            })?;
-        let system_prompt = system_re
-            .captures(&prompts_md)
-            .and_then(|cap| cap.get(1))
-            .map(|m| m.as_str().trim())
-            .ok_or_else(|| AIError {
-                message: "Failed to extract system prompt from markdown".to_string(),
-            })?;
-
-        // Extract user prompt
-        let user_re = Regex::new(r"(?s)## User Prompt\n\n(.*)$").map_err(|e| AIError {
-            message: format!("Failed to compile user prompt regex: {}", e),
-        })?;
-        let user_prompt = user_re
-            .captures(&prompts_md)
-            .and_then(|cap| cap.get(1))
-            .map(|m| m.as_str().trim())
-            .ok_or_else(|| AIError {
-                message: "Failed to extract user prompt from markdown".to_string(),
-            })?;
-
-        let system_message = chat_completion::ChatCompletionMessage {
-            role: MessageRole::system,
-            content: Content::Text(system_prompt.to_string()),
-            name: None,
-            tool_calls: None,
-            tool_call_id: None,
-        };
-
-        let user_message = chat_completion::ChatCompletionMessage {
-            role: MessageRole::user,
-            content: Content::Text(user_prompt.replace("{diff}", diff)),
-            name: None,
-            tool_calls: None,
-            tool_call_id: None,
-        };
-
-        let req =
-            ChatCompletionRequest::new(self.model.clone(), vec![system_message, user_message]);
-
-        let result = self
-            .client
-            .chat_completion(req)
-            .await
-            .map_err(|e| AIError {
-                message: format!("OpenAI API error: {}", e),
-            })?;
-
-        let response = result.choices[0]
-            .message
-            .content
-            .clone()
-            .ok_or_else(|| AIError {
-                message: "No content in OpenAI response".to_string(),
-            })?;
-
-        // Log the interaction
-        info!("AI Request:\n{}", diff);
-        info!("AI Response:\n{}", response);
-
-        Ok(response)
-    }
-
     pub async fn generate_commit_message_with_tools(
         &self,
         mut conversation_history: Vec<ChatCompletionMessage>,
@@ -286,47 +213,6 @@ mod tests {
     use super::*;
     use serial_test::serial;
     use std::env;
-    use tokio;
-
-    #[tokio::test]
-    #[serial]
-    async fn test_generate_commit_message() {
-        // This test requires a valid OpenAI API key in the environment
-        // It's an integration test and may be skipped in CI/CD if API key is not available
-        if let Ok(api_key) = env::var("OPENAI_API_KEY") {
-            // Clean environment first
-            env::remove_var("IAC_OPENAI_MODEL");
-            // Set a test model
-            env::set_var("OPENAI_MODEL", "gpt-4o-mini");
-            let config = Config::new().unwrap();
-            let client = AIClient::new(api_key, config).unwrap();
-            let diff = "diff --git a/src/main.rs b/src/main.rs
-                       index 123..456 789
-                       --- a/src/main.rs
-                       +++ b/src/main.rs
-                       @@ -1,3 +1,4 @@
-                       +// Add a new feature
-                        fn main() {
-                       -    println!(\"Hello\");
-                       +    println!(\"Hello, World!\");
-                        }";
-
-            let result = client.generate_commit_message(diff).await;
-            if result.is_ok() {
-                let message = result.unwrap();
-                assert!(!message.is_empty());
-                // Basic format check
-                assert!(message.contains(": "));
-            } else {
-                // If the test fails, print the error but don't fail the test
-                // This could be due to network issues, API rate limits, etc.
-                println!("Integration test skipped due to API error: {:?}", result.err());
-            }
-
-            // Clean up
-            env::remove_var("OPENAI_MODEL");
-        }
-    }
 
     #[test]
     #[serial]
