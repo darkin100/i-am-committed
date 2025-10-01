@@ -38,7 +38,7 @@ mod config;
 mod git;
 mod tools;
 
-use crate::agent::Agent;
+use crate::agent::{Agent, CommitMessageResult};
 use crate::ai::AIClient;
 use crate::commit_formatter::CommitFormatter;
 use crate::config::Config;
@@ -110,20 +110,23 @@ enum Commands {
 async fn generate_formatted_commit_message(
     git_client: &GitClient,
     ai_client: &AIClient,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<CommitMessageResult, Box<dyn std::error::Error>> {
     // Use agent for agentic workflow with tool calling
     // The agent will call get_staged_changes tool itself
     let agent = Agent::new(ai_client, git_client);
-    let raw_message = agent.generate_commit_message().await?;
-    info!("Raw AI-generated message: {}", raw_message);
+    let result = agent.generate_commit_message().await?;
+    info!("Raw AI-generated message: {}", result.message);
 
     // Format the commit message
-    let formatter = CommitFormatter::new(raw_message.clone());
+    let formatter = CommitFormatter::new(result.message.clone());
     let formatted_commit = formatter.format();
     let final_message = format!("{}", formatted_commit);
     info!("Formatted commit message: {}", final_message);
 
-    Ok(final_message)
+    Ok(CommitMessageResult {
+        message: final_message,
+        token_usage: result.token_usage,
+    })
 }
 
 #[tokio::main]
@@ -179,11 +182,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             match generate_formatted_commit_message(&git_client, &ai_client).await {
-                Ok(commit_message_content) => {
-                    fs::write(&commit_msg_file_path, &commit_message_content)?;
+                Ok(result) => {
+                    fs::write(&commit_msg_file_path, &result.message)?;
                     info!(
                         "Successfully wrote AI-generated commit message to {}",
                         commit_msg_file_path
+                    );
+                    info!(
+                        "Token usage - Prompt: {}, Completion: {}, Total: {}",
+                        result.token_usage.prompt_tokens,
+                        result.token_usage.completion_tokens,
+                        result.token_usage.total_tokens
                     );
                 }
                 Err(e) => {
@@ -239,12 +248,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             println!("-----------------------------------------");
 
-            let commit_message = generate_formatted_commit_message(&git_client, &ai_client).await?;
+            let result = generate_formatted_commit_message(&git_client, &ai_client).await?;
 
             println!("\n📝 Suggested Commit Message:");
             println!("---------------------------------------------------");
-            println!("{}", commit_message);
+            println!("{}", result.message);
             println!("---------------------------------------------------");
+            println!(
+                "{} {} prompt + {} completion = {} total",
+                "💡 Token Usage:".blue(),
+                result.token_usage.prompt_tokens,
+                result.token_usage.completion_tokens,
+                result.token_usage.total_tokens
+            );
 
             println!("\nPlease select an option:");
             println!("[1] Use the suggested message ✅ (default)");
@@ -270,7 +286,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let final_message = match num {
                 1 => {
                     info!("SUCCESS - User accepted AI-generated commit message");
-                    commit_message
+                    result.message
                 },
                 2 => {
                     info!("FAILURE - User chose to edit commit message manually");
@@ -279,7 +295,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     use tempfile::NamedTempFile; // Keep this local as it's specific to this block
 
                     let mut temp_file = NamedTempFile::new()?;
-                    write!(temp_file, "{}", commit_message)?;
+                    write!(temp_file, "{}", result.message)?;
                     temp_file.flush()?;
 
                     let status = Command::new("nano")

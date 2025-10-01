@@ -1,4 +1,4 @@
-use crate::ai::AIClient;
+use crate::ai::{AIClient, TokenUsage};
 use crate::git::GitClient;
 use crate::tools::executor::ToolExecutor;
 use log::{info, warn};
@@ -16,6 +16,11 @@ impl std::fmt::Display for AgentError {
 }
 
 impl std::error::Error for AgentError {}
+
+pub struct CommitMessageResult {
+    pub message: String,
+    pub token_usage: TokenUsage,
+}
 
 pub struct Agent<'a> {
     ai_client: &'a AIClient,
@@ -93,10 +98,17 @@ impl<'a> Agent<'a> {
         Ok(vec![system_message, user_message])
     }
 
-    pub async fn generate_commit_message(&self) -> Result<String, AgentError> {
+    pub async fn generate_commit_message(&self) -> Result<CommitMessageResult, AgentError> {
         info!("Starting agent loop for commit message generation");
 
         let tool_executor = ToolExecutor::new(self.git_client);
+
+        // Track total token usage across all API calls
+        let mut total_token_usage = TokenUsage {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+        };
 
         // Initial request - LLM will call get_staged_changes tool
         // Pass empty conversation history, AI client will add system/user prompts
@@ -107,6 +119,11 @@ impl<'a> Agent<'a> {
             .map_err(|e| AgentError {
                 message: format!("Failed to generate commit message: {}", e),
             })?;
+
+        // Accumulate token usage from first API call
+        total_token_usage.prompt_tokens += response.token_usage.prompt_tokens;
+        total_token_usage.completion_tokens += response.token_usage.completion_tokens;
+        total_token_usage.total_tokens += response.token_usage.total_tokens;
 
         // Build conversation history from the response
         // We need to reconstruct the full conversation including system and user prompts
@@ -124,10 +141,13 @@ impl<'a> Agent<'a> {
             tool_call_id: None,
         });
 
-        // If no tool calls, return the response
+        // If no tool calls, return the response with token usage
         if response.tool_calls.is_none() {
             if let Some(content) = response.content {
-                return Ok(content);
+                return Ok(CommitMessageResult {
+                    message: content,
+                    token_usage: total_token_usage,
+                });
             }
             return Err(AgentError {
                 message: "No content or tool calls in response".to_string(),
@@ -187,6 +207,11 @@ impl<'a> Agent<'a> {
                     message: format!("Failed to continue conversation: {}", e),
                 })?;
 
+            // Accumulate token usage from this API call
+            total_token_usage.prompt_tokens += response.token_usage.prompt_tokens;
+            total_token_usage.completion_tokens += response.token_usage.completion_tokens;
+            total_token_usage.total_tokens += response.token_usage.total_tokens;
+
             // Add assistant's response to history
             conversation_history.push(ChatCompletionMessage {
                 role: MessageRole::assistant,
@@ -200,7 +225,10 @@ impl<'a> Agent<'a> {
             if response.tool_calls.is_none() {
                 if let Some(content) = response.content {
                     info!("Agent loop completed after {} iterations", iteration);
-                    return Ok(content);
+                    return Ok(CommitMessageResult {
+                        message: content,
+                        token_usage: total_token_usage,
+                    });
                 }
                 return Err(AgentError {
                     message: "No content in final response".to_string(),

@@ -168,6 +168,11 @@ impl AIClient {
         Ok(AgentResponse {
             content,
             tool_calls,
+            token_usage: TokenUsage {
+                prompt_tokens: result.usage.prompt_tokens,
+                completion_tokens: result.usage.completion_tokens,
+                total_tokens: result.usage.total_tokens,
+            },
         })
     }
 
@@ -199,6 +204,11 @@ impl AIClient {
         Ok(AgentResponse {
             content,
             tool_calls,
+            token_usage: TokenUsage {
+                prompt_tokens: result.usage.prompt_tokens,
+                completion_tokens: result.usage.completion_tokens,
+                total_tokens: result.usage.total_tokens,
+            },
         })
     }
 }
@@ -206,6 +216,14 @@ impl AIClient {
 pub struct AgentResponse {
     pub content: Option<String>,
     pub tool_calls: Option<Vec<ToolCall>>,
+    pub token_usage: TokenUsage,
+}
+
+#[derive(Debug, Clone)]
+pub struct TokenUsage {
+    pub prompt_tokens: i32,
+    pub completion_tokens: i32,
+    pub total_tokens: i32,
 }
 
 #[cfg(test)]
