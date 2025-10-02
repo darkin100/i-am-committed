@@ -23,13 +23,13 @@ pub struct CommitMessageResult {
 }
 
 pub struct Agent<'a> {
-    ai_client: &'a AIClient,
+    ai_client: &'a mut AIClient,
     git_client: &'a GitClient,
     max_iterations: usize,
 }
 
 impl<'a> Agent<'a> {
-    pub fn new(ai_client: &'a AIClient, git_client: &'a GitClient) -> Self {
+    pub fn new(ai_client: &'a mut AIClient, git_client: &'a GitClient) -> Self {
         Agent {
             ai_client,
             git_client,
@@ -42,7 +42,9 @@ impl<'a> Agent<'a> {
         self
     }
 
-    async fn build_initial_conversation_history(&self) -> Result<Vec<ChatCompletionMessage>, AgentError> {
+    async fn build_initial_conversation_history(
+        &self,
+    ) -> Result<Vec<ChatCompletionMessage>, AgentError> {
         // Load prompts and build the initial conversation with system and user messages
         use crate::config::Config;
         use regex::Regex;
@@ -56,9 +58,10 @@ impl<'a> Agent<'a> {
         })?;
 
         // Extract system prompt
-        let system_re = Regex::new(r"(?s)## System Prompt\n\n(.*?)## User Prompt").map_err(|e| AgentError {
-            message: format!("Failed to compile system prompt regex: {}", e),
-        })?;
+        let system_re =
+            Regex::new(r"(?s)## System Prompt\n\n(.*?)## User Prompt").map_err(|e| AgentError {
+                message: format!("Failed to compile system prompt regex: {}", e),
+            })?;
         let system_prompt = system_re
             .captures(&prompts_md)
             .and_then(|cap| cap.get(1))
@@ -98,7 +101,7 @@ impl<'a> Agent<'a> {
         Ok(vec![system_message, user_message])
     }
 
-    pub async fn generate_commit_message(&self) -> Result<CommitMessageResult, AgentError> {
+    pub async fn generate_commit_message(&mut self) -> Result<CommitMessageResult, AgentError> {
         info!("Starting agent loop for commit message generation");
 
         let tool_executor = ToolExecutor::new(self.git_client);
@@ -127,10 +130,12 @@ impl<'a> Agent<'a> {
 
         // Build conversation history from the response
         // We need to reconstruct the full conversation including system and user prompts
-        let mut conversation_history = self.build_initial_conversation_history().await
-            .map_err(|e| AgentError {
-                message: format!("Failed to build conversation history: {}", e),
-            })?;
+        let mut conversation_history =
+            self.build_initial_conversation_history()
+                .await
+                .map_err(|e| AgentError {
+                    message: format!("Failed to build conversation history: {}", e),
+                })?;
 
         // Add assistant's response to history
         conversation_history.push(ChatCompletionMessage {
@@ -177,8 +182,8 @@ impl<'a> Agent<'a> {
             for tool_call in &tool_calls {
                 let function_name = tool_call.function.name.as_deref().unwrap_or("unknown");
                 let arguments_str = tool_call.function.arguments.as_deref().unwrap_or("{}");
-                let arguments: serde_json::Value = serde_json::from_str(arguments_str)
-                    .unwrap_or(serde_json::json!({}));
+                let arguments: serde_json::Value =
+                    serde_json::from_str(arguments_str).unwrap_or(serde_json::json!({}));
 
                 info!("Executing tool: {}", function_name);
 
@@ -236,9 +241,15 @@ impl<'a> Agent<'a> {
             }
         }
 
-        warn!("Agent loop reached max iterations ({})", self.max_iterations);
+        warn!(
+            "Agent loop reached max iterations ({})",
+            self.max_iterations
+        );
         Err(AgentError {
-            message: format!("Agent loop exceeded maximum iterations ({})", self.max_iterations),
+            message: format!(
+                "Agent loop exceeded maximum iterations ({})",
+                self.max_iterations
+            ),
         })
     }
 }

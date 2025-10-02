@@ -24,8 +24,15 @@ impl<'a> ToolExecutor<'a> {
         ToolExecutor { git_client }
     }
 
-    pub fn execute(&self, tool_name: &str, arguments: &Value) -> Result<String, ToolExecutionError> {
-        info!("Executing tool: {} with arguments: {}", tool_name, arguments);
+    pub fn execute(
+        &self,
+        tool_name: &str,
+        arguments: &Value,
+    ) -> Result<String, ToolExecutionError> {
+        info!(
+            "Executing tool: {} with arguments: {}",
+            tool_name, arguments
+        );
 
         let result = match tool_name {
             "get_file_content" => self.get_file_content(arguments),
@@ -40,7 +47,10 @@ impl<'a> ToolExecutor<'a> {
         };
 
         match &result {
-            Ok(output) => info!("Tool execution successful. Output length: {} chars", output.len()),
+            Ok(output) => info!(
+                "Tool execution successful. Output length: {} chars",
+                output.len()
+            ),
             Err(e) => info!("Tool execution failed: {}", e),
         }
 
@@ -156,7 +166,11 @@ mod tests {
         assert!(result.is_ok());
         let branch = result.unwrap();
         // Branch could be "main", "master", or the system's default
-        assert!(!branch.is_empty(), "Branch name should not be empty, got: '{}'", branch);
+        assert!(
+            !branch.is_empty(),
+            "Branch name should not be empty, got: '{}'",
+            branch
+        );
     }
 
     #[test]

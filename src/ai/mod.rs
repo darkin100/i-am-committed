@@ -2,7 +2,9 @@ use crate::config::Config;
 use crate::tools::get_tool_definitions;
 use log::{error, info};
 use openai_api_rs::v1::api::OpenAIClient;
-use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, Content, MessageRole, ChatCompletionMessage, ToolCall};
+use openai_api_rs::v1::chat_completion::{
+    self, ChatCompletionMessage, ChatCompletionRequest, Content, MessageRole, ToolCall,
+};
 use openai_api_rs::v1::common::GPT4_O_MINI;
 use regex::Regex;
 use std::{env, fs};
@@ -46,7 +48,7 @@ impl AIClient {
             env::var("IAC_OPENAI_ENDPOINT").or_else(|_| env::var("OPENAI_ENDPOINT"));
 
         if let Ok(endpoint) = custom_endpoint {
-            info!("Using custom OpenAI endpoint: {}", endpoint);
+            info!("Using endpoint: {}", endpoint);
             builder = builder.with_endpoint(endpoint);
         }
 
@@ -76,7 +78,7 @@ impl AIClient {
             .or_else(|_| env::var("OPENAI_MODEL"))
             .unwrap_or_else(|_| GPT4_O_MINI.to_string());
 
-        info!("Using OpenAI model: {}", model);
+        info!("Using model: {}", model);
 
         Ok(AIClient {
             client,
@@ -90,7 +92,7 @@ impl AIClient {
     }
 
     pub async fn generate_commit_message_with_tools(
-        &self,
+        &mut self,
         mut conversation_history: Vec<ChatCompletionMessage>,
     ) -> Result<AgentResponse, AIError> {
         // Load and parse prompts from config
@@ -160,10 +162,15 @@ impl AIClient {
         let content = choice.message.content.clone();
         let tool_calls = choice.message.tool_calls.clone();
 
-        info!("AI Response - Has content: {}, Has tool calls: {}",
-            content.is_some(), tool_calls.is_some());
-        info!("Token Usage - Prompt: {}, Completion: {}, Total: {}",
-            result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens);
+        info!(
+            "AI Response - Has content: {}, Has tool calls: {}",
+            content.is_some(),
+            tool_calls.is_some()
+        );
+        info!(
+            "Token Usage - Prompt: {}, Completion: {}, Total: {}",
+            result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens
+        );
 
         Ok(AgentResponse {
             content,
@@ -177,7 +184,7 @@ impl AIClient {
     }
 
     pub async fn continue_conversation_with_tools(
-        &self,
+        &mut self,
         conversation_history: Vec<ChatCompletionMessage>,
     ) -> Result<AgentResponse, AIError> {
         let tools = get_tool_definitions();
@@ -196,10 +203,15 @@ impl AIClient {
         let content = choice.message.content.clone();
         let tool_calls = choice.message.tool_calls.clone();
 
-        info!("AI Response - Has content: {}, Has tool calls: {}",
-            content.is_some(), tool_calls.is_some());
-        info!("Token Usage - Prompt: {}, Completion: {}, Total: {}",
-            result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens);
+        info!(
+            "AI Response - Has content: {}, Has tool calls: {}",
+            content.is_some(),
+            tool_calls.is_some()
+        );
+        info!(
+            "Token Usage - Prompt: {}, Completion: {}, Total: {}",
+            result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens
+        );
 
         Ok(AgentResponse {
             content,

@@ -109,11 +109,11 @@ enum Commands {
 
 async fn generate_formatted_commit_message(
     git_client: &GitClient,
-    ai_client: &AIClient,
+    ai_client: &mut AIClient,
 ) -> Result<CommitMessageResult, Box<dyn std::error::Error>> {
     // Use agent for agentic workflow with tool calling
     // The agent will call get_staged_changes tool itself
-    let agent = Agent::new(ai_client, git_client);
+    let mut agent = Agent::new(ai_client, git_client);
     let result = agent.generate_commit_message().await?;
     info!("Raw AI-generated message: {}", result.message);
 
@@ -174,14 +174,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })?;
             let git_client = GitClient::new();
             let config = Config::new()?;
-            let ai_client = AIClient::new(api_key, config)?;
+            let mut ai_client = AIClient::new(api_key, config)?;
 
             // Check for staged changes. Even if none, AI might generate a message for an empty commit if allowed.
             if !git_client.has_staged_changes()? {
                 warn!("No staged changes detected by git_client.has_staged_changes() in hook mode. Proceeding to generate message based on (likely empty) diff.");
             }
 
-            match generate_formatted_commit_message(&git_client, &ai_client).await {
+            match generate_formatted_commit_message(&git_client, &mut ai_client).await {
                 Ok(result) => {
                     fs::write(&commit_msg_file_path, &result.message)?;
                     info!(
@@ -225,7 +225,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let git_client = GitClient::new();
             let config = Config::new()?;
-            let ai_client = AIClient::new(api_key, config)?;
+            let mut ai_client = AIClient::new(api_key, config)?;
 
             println!("v{} | Model: {}", VERSION, ai_client.get_model());
             println!("\n{}", "🔍 Analysing Changes...".blue());
@@ -248,7 +248,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             println!("-----------------------------------------");
 
-            let result = generate_formatted_commit_message(&git_client, &ai_client).await?;
+            let result = generate_formatted_commit_message(&git_client, &mut ai_client).await?;
 
             println!("\n📝 Suggested Commit Message:");
             println!("---------------------------------------------------");
@@ -287,7 +287,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 1 => {
                     info!("SUCCESS - User accepted AI-generated commit message");
                     result.message
-                },
+                }
                 2 => {
                     info!("FAILURE - User chose to edit commit message manually");
                     // Edit commit message using nano
