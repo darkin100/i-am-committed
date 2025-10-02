@@ -127,6 +127,9 @@ impl AIClient {
 
         // Build initial messages if conversation history is empty
         if conversation_history.is_empty() {
+            info!("System Prompt: {}", system_prompt);
+            info!("User Prompt: {}", user_prompt);
+
             let system_message = chat_completion::ChatCompletionMessage {
                 role: MessageRole::system,
                 content: Content::Text(system_prompt.to_string()),
@@ -146,6 +149,7 @@ impl AIClient {
             conversation_history = vec![system_message, user_message];
         }
 
+        info!("Sending chat completion request with {} messages", conversation_history.len());
         let tools = get_tool_definitions();
         let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history);
         req.tools = Some(tools);
@@ -187,6 +191,18 @@ impl AIClient {
         &mut self,
         conversation_history: Vec<ChatCompletionMessage>,
     ) -> Result<AgentResponse, AIError> {
+        info!("Continuing conversation with {} messages", conversation_history.len());
+        for (i, msg) in conversation_history.iter().enumerate() {
+            match &msg.content {
+                Content::Text(text) => {
+                    info!("Message {}: role={:?}, content={}", i, msg.role, text);
+                }
+                _ => {
+                    info!("Message {}: role={:?}, content=<non-text>", i, msg.role);
+                }
+            }
+        }
+
         let tools = get_tool_definitions();
         let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history);
         req.tools = Some(tools);
