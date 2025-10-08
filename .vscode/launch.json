@@ -2,15 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug executable 'iamcommitted'",
+            "name": "Launch",
             "type": "lldb",
             "request": "launch",
-            "cargo": {
-                "args": [
-                    "run",
-                    "--bin=iamcommitted"
-                ]
-            },
+            "program": "${workspaceFolder}/target/debug/iamcommitted",
             "args": []
         }
     ]
