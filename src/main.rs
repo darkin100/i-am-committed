@@ -4,16 +4,19 @@ use log::{info, warn};
 use std::fs;
 use std::io::Write;
 use std::{env, io, process::Command};
+use uuid::Uuid;
 
-fn setup_logging(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn setup_logging(verbose: bool, session_id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let log_dir = Config::get_log_dir()?;
     std::fs::create_dir_all(&log_dir)?;
 
+    let session_id = session_id.to_string();
     let dispatch = fern::Dispatch::new()
-        .format(|out, message, record| {
+        .format(move |out, message, record| {
             out.finish(format_args!(
-                "[{}] [{}] {}",
+                "[{}] [{}] [{}] {}",
                 chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                session_id,
                 record.level(),
                 message
             ))
@@ -135,11 +138,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cli = Cli::parse();
 
+    // Generate unique session ID
+    let session_id = Uuid::new_v4().to_string();
+
     // Set up logging with verbose flag if provided
-    setup_logging(cli.verbose)?;
+    setup_logging(cli.verbose, &session_id)?;
+
+    info!("Session started with ID: {}", session_id);
 
     if cli.verbose {
         println!("Verbose mode enabled. Logs will be printed to console.");
+        println!("Session ID: {}", session_id);
     }
 
     match cli.command {
