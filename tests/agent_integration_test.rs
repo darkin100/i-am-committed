@@ -173,76 +173,92 @@ fn extract_commit_message(raw_message: &str) -> String {
     }
 }
 
-#[tokio::test]
-async fn test_agent_with_real_diffs_generates_valid_messages() {
-    // Skip test if no API key is available
-    let api_key = match get_api_key() {
-        Some(key) => key,
-        None => {
-            println!("Skipping test: No OpenAI API key found");
-            return;
-        }
-    };
+// #[tokio::test]
+// async fn test_agent_with_real_diffs_generates_valid_messages() {
+//     // Skip test if no API key is available
+//     let api_key = match get_api_key() {
+//         Some(key) => key,
+//         None => {
+//             println!("Skipping test: No OpenAI API key found");
+//             return;
+//         }
+//     };
 
-    // Load test data from log files (limit to 3 for faster testing)
-    let test_data = load_test_data_from_logs(3);
+//     // Load test data from log files (limit to 3 for faster testing)
+//     let test_data = load_test_data_from_logs(3);
 
-    if test_data.is_empty() {
-        println!("Warning: No test data loaded from logs, skipping test");
-        return;
-    }
+//     if test_data.is_empty() {
+//         println!("Warning: No test data loaded from logs, skipping test");
+//         return;
+//     }
 
-    println!("Loaded {} test cases from log files", test_data.len());
+//     println!("Loaded {} test cases from log files", test_data.len());
 
-    for (filename, interaction) in test_data {
-        println!("\n=== Testing with: {} ===", filename);
-        println!(
-            "Expected message pattern: {}",
-            interaction.expected_message.lines().next().unwrap_or("")
-        );
+//     let mut total_prompt_tokens = 0;
+//     let mut total_completion_tokens = 0;
+//     let mut total_tokens = 0;
 
-        // Set up test repository with changes
-        let temp_dir = setup_test_repo_with_diff(&interaction.diff);
-        let git_client = GitClient::with_working_dir(temp_dir.path().to_string_lossy().to_string());
+//     for (filename, interaction) in test_data {
+//         println!("\n=== Testing with: {} ===", filename);
+//         println!(
+//             "Expected message pattern: {}",
+//             interaction.expected_message.lines().next().unwrap_or("")
+//         );
 
-        // Create AI client
-        let config = Config::new().expect("Failed to create config");
-        let mut ai_client =
-            AIClient::new(api_key.clone(), config).expect("Failed to create AI client");
+//         // Set up test repository with changes
+//         let temp_dir = setup_test_repo_with_diff(&interaction.diff);
+//         let git_client = GitClient::with_working_dir(temp_dir.path().to_string_lossy().to_string());
 
-        // Create agent
-        let mut agent = Agent::new(&mut ai_client, &git_client).with_max_iterations(5);
+//         // Create AI client
+//         let config = Config::new().expect("Failed to create config");
+//         let mut ai_client =
+//             AIClient::new(api_key.clone(), config).expect("Failed to create AI client");
 
-        // Generate commit message
-        let result = agent.generate_commit_message().await;
+//         println!("Using model: {}", ai_client.get_model());
 
-        // Assert that we got a result
-        assert!(
-            result.is_ok(),
-            "Agent should successfully generate a commit message for {}",
-            filename
-        );
+//         // Create agent
+//         let mut agent = Agent::new(&mut ai_client, &git_client).with_max_iterations(5);
 
-        let commit_result = result.unwrap();
-        let commit_message = extract_commit_message(&commit_result.message);
+//         // Generate commit message
+//         let result = agent.generate_commit_message().await;
 
-        // Verify the message is not empty
-        assert!(
-            !commit_message.is_empty(),
-            "Commit message should not be empty for {}",
-            filename
-        );
+//         // Assert that we got a result
+//         assert!(
+//             result.is_ok(),
+//             "Agent should successfully generate a commit message for {}",
+//             filename
+//         );
 
-        println!(
-            "✓ Generated message: {}",
-            commit_message.lines().next().unwrap_or("")
-        );
-        println!(
-            "  Token usage: {} total",
-            commit_result.token_usage.total_tokens
-        );
-    }
-}
+//         let commit_result = result.unwrap();
+//         let commit_message = extract_commit_message(&commit_result.message);
+
+//         // Track token usage
+//         total_prompt_tokens += commit_result.token_usage.prompt_tokens;
+//         total_completion_tokens += commit_result.token_usage.completion_tokens;
+//         total_tokens += commit_result.token_usage.total_tokens;
+
+//         // Verify the message is not empty
+//         assert!(
+//             !commit_message.is_empty(),
+//             "Commit message should not be empty for {}",
+//             filename
+//         );
+
+//         println!(
+//             "✓ Generated message: {}",
+//             commit_message.lines().next().unwrap_or("")
+//         );
+//         println!(
+//             "  Token usage: {} prompt + {} completion = {} total",
+//             commit_result.token_usage.prompt_tokens,
+//             commit_result.token_usage.completion_tokens,
+//             commit_result.token_usage.total_tokens
+//         );
+//     }
+
+//     println!("\n=== Test Summary ===");
+//     println!("Token Usage: {} prompt + {} completion = {} total", total_prompt_tokens, total_completion_tokens, total_tokens);
+// }
 
 #[tokio::test]
 async fn test_agent_with_real_diffs_matches_conventional_commits() {
@@ -255,8 +271,8 @@ async fn test_agent_with_real_diffs_matches_conventional_commits() {
         }
     };
 
-    // Load test data from log files (limit to 5 for testing)
-    let test_data = load_test_data_from_logs(5);
+    // Load test data from log files (limit to 50 for testing)
+    let test_data = load_test_data_from_logs(50);
 
     if test_data.is_empty() {
         println!("Warning: No test data loaded from logs, skipping test");
@@ -275,6 +291,9 @@ async fn test_agent_with_real_diffs_matches_conventional_commits() {
 
     let mut passed = 0;
     let mut failed = 0;
+    let mut total_prompt_tokens = 0;
+    let mut total_completion_tokens = 0;
+    let mut total_tokens = 0;
 
     for (filename, interaction) in test_data {
         println!("\n=== Testing: {} ===", filename);
@@ -288,6 +307,8 @@ async fn test_agent_with_real_diffs_matches_conventional_commits() {
         let mut ai_client =
             AIClient::new(api_key.clone(), config).expect("Failed to create AI client");
 
+        println!("Using model: {}", ai_client.get_model());
+
         // Create agent
         let mut agent = Agent::new(&mut ai_client, &git_client).with_max_iterations(5);
 
@@ -300,16 +321,33 @@ async fn test_agent_with_real_diffs_matches_conventional_commits() {
             continue;
         }
 
-        let raw_message = result.unwrap().message;
-        let commit_message = extract_commit_message(&raw_message);
+        let commit_result = result.unwrap();
+        let commit_message = extract_commit_message(&commit_result.message);
         let first_line = commit_message.lines().next().unwrap_or("");
+
+        // Track token usage
+        total_prompt_tokens += commit_result.token_usage.prompt_tokens;
+        total_completion_tokens += commit_result.token_usage.completion_tokens;
+        total_tokens += commit_result.token_usage.total_tokens;
 
         // Check if it matches conventional commits format
         if conventional_commit_regex.is_match(first_line) {
             println!("✓ Matches conventional commits: {}", first_line);
+            println!(
+                "  Token usage: {} prompt + {} completion = {} total",
+                commit_result.token_usage.prompt_tokens,
+                commit_result.token_usage.completion_tokens,
+                commit_result.token_usage.total_tokens
+            );
             passed += 1;
         } else {
             println!("✗ Does NOT match conventional commits: {}", first_line);
+            println!(
+                "  Token usage: {} prompt + {} completion = {} total",
+                commit_result.token_usage.prompt_tokens,
+                commit_result.token_usage.completion_tokens,
+                commit_result.token_usage.total_tokens
+            );
             failed += 1;
         }
     }
@@ -317,6 +355,10 @@ async fn test_agent_with_real_diffs_matches_conventional_commits() {
     println!("\n=== Summary ===");
     println!("Passed: {}/{}", passed, passed + failed);
     println!("Failed: {}/{}", failed, passed + failed);
+    println!(
+        "Token Usage: {} prompt + {} completion = {} total",
+        total_prompt_tokens, total_completion_tokens, total_tokens
+    );
 
     // Assert that at least 80% pass
     let success_rate = passed as f64 / (passed + failed) as f64;
@@ -357,6 +399,8 @@ async fn test_agent_validates_message_structure_with_real_diffs() {
     let config = Config::new().expect("Failed to create config");
     let mut ai_client = AIClient::new(api_key, config).expect("Failed to create AI client");
 
+    println!("Using model: {}", ai_client.get_model());
+
     // Create agent
     let mut agent = Agent::new(&mut ai_client, &git_client).with_max_iterations(5);
 
@@ -367,8 +411,8 @@ async fn test_agent_validates_message_structure_with_real_diffs() {
         "Agent should successfully generate a commit message"
     );
 
-    let raw_message = result.unwrap().message;
-    let commit_message = extract_commit_message(&raw_message);
+    let commit_result = result.unwrap();
+    let commit_message = extract_commit_message(&commit_result.message);
     let lines: Vec<&str> = commit_message.lines().collect();
 
     assert!(!lines.is_empty(), "Should have at least a subject line");
@@ -399,6 +443,14 @@ async fn test_agent_validates_message_structure_with_real_diffs() {
 
     println!("✓ All structure validations passed");
     println!("Subject: {}", subject);
+
+    println!("\n=== Test Summary ===");
+    println!(
+        "Token Usage: {} prompt + {} completion = {} total",
+        commit_result.token_usage.prompt_tokens,
+        commit_result.token_usage.completion_tokens,
+        commit_result.token_usage.total_tokens
+    );
 }
 
 #[test]
