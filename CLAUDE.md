@@ -97,7 +97,7 @@ The application can run as a `prepare-commit-msg` hook:
 
 ### Logging
 
-Logs are written to `~/.iamcommitted/logs/` with timestamp-based filenames. Use `-v` flag for verbose output to console.
+On a Mac log files are stored `Library/Logs/iamcommitted`
 
 ## Git Commit Workflow
 

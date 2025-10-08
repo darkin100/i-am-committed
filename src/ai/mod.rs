@@ -149,7 +149,10 @@ impl AIClient {
             conversation_history = vec![system_message, user_message];
         }
 
-        info!("Sending chat completion request with {} messages", conversation_history.len());
+        info!(
+            "Sending chat completion request with {} messages",
+            conversation_history.len()
+        );
         let tools = get_tool_definitions();
         let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history);
         req.tools = Some(tools);
@@ -191,7 +194,10 @@ impl AIClient {
         &mut self,
         conversation_history: Vec<ChatCompletionMessage>,
     ) -> Result<AgentResponse, AIError> {
-        info!("Continuing conversation with {} messages", conversation_history.len());
+        info!(
+            "Continuing conversation with {} messages",
+            conversation_history.len()
+        );
         for (i, msg) in conversation_history.iter().enumerate() {
             match &msg.content {
                 Content::Text(text) => {
