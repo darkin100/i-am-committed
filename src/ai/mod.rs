@@ -2,11 +2,12 @@ use crate::config::Config;
 use crate::tools::get_tool_definitions;
 use log::{error, info};
 use openai_api_rs::v1::api::OpenAIClient;
-use openai_api_rs::v1::chat_completion::{
-    ChatCompletionMessage, Content, MessageRole, ToolCall,
-};
 use openai_api_rs::v1::chat_completion::chat_completion::ChatCompletionRequest;
+use openai_api_rs::v1::chat_completion::{ChatCompletionMessage, Content, MessageRole, ToolCall};
 use openai_api_rs::v1::common::GPT4_O_MINI;
+use opentelemetry::global;
+use opentelemetry::trace::{Span, SpanKind, Tracer};
+use opentelemetry::KeyValue;
 use regex::Regex;
 use std::{env, fs};
 
@@ -96,6 +97,15 @@ impl AIClient {
         &mut self,
         mut conversation_history: Vec<ChatCompletionMessage>,
     ) -> Result<AgentResponse, AIError> {
+        let tracer = global::tracer("iamcommitted");
+        let mut span = tracer
+            .span_builder("llm.chat_completion")
+            .with_kind(SpanKind::Client)
+            .start(&tracer);
+
+        span.set_attribute(KeyValue::new("llm.model", self.model.clone()));
+        span.set_attribute(KeyValue::new("llm.operation", "generate_commit_message_with_tools"));
+
         // Load and parse prompts from config
         let prompts_md = self.config.load_prompts().map_err(|e| AIError {
             message: format!("Failed to load prompts: {}", e),
@@ -154,7 +164,11 @@ impl AIClient {
             "Sending chat completion request with {} messages",
             conversation_history.len()
         );
+        span.set_attribute(KeyValue::new("llm.message_count", conversation_history.len() as i64));
+
         let tools = get_tool_definitions();
+        span.set_attribute(KeyValue::new("llm.tool_count", tools.len() as i64));
+
         let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history);
         req.tools = Some(tools);
 
@@ -162,8 +176,12 @@ impl AIClient {
             .client
             .chat_completion(req)
             .await
-            .map_err(|e| AIError {
-                message: format!("OpenAI API error: {}", e),
+            .map_err(|e| {
+                span.record_error(&e);
+                span.set_attribute(KeyValue::new("llm.error", e.to_string()));
+                AIError {
+                    message: format!("OpenAI API error: {}", e),
+                }
             })?;
 
         let choice = &result.choices[0];
@@ -179,6 +197,19 @@ impl AIClient {
             "Token Usage - Prompt: {}, Completion: {}, Total: {}",
             result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens
         );
+
+        // Add token usage attributes to span
+        span.set_attribute(KeyValue::new("llm.usage.prompt_tokens", result.usage.prompt_tokens as i64));
+        span.set_attribute(KeyValue::new("llm.usage.completion_tokens", result.usage.completion_tokens as i64));
+        span.set_attribute(KeyValue::new("llm.usage.total_tokens", result.usage.total_tokens as i64));
+        span.set_attribute(KeyValue::new("llm.response.has_content", content.is_some()));
+        span.set_attribute(KeyValue::new("llm.response.has_tool_calls", tool_calls.is_some()));
+
+        if let Some(ref calls) = tool_calls {
+            span.set_attribute(KeyValue::new("llm.response.tool_call_count", calls.len() as i64));
+        }
+
+        span.end();
 
         Ok(AgentResponse {
             content,
@@ -195,10 +226,21 @@ impl AIClient {
         &mut self,
         conversation_history: Vec<ChatCompletionMessage>,
     ) -> Result<AgentResponse, AIError> {
+        let tracer = global::tracer("iamcommitted");
+        let mut span = tracer
+            .span_builder("llm.chat_completion")
+            .with_kind(SpanKind::Client)
+            .start(&tracer);
+
+        span.set_attribute(KeyValue::new("llm.model", self.model.clone()));
+        span.set_attribute(KeyValue::new("llm.operation", "continue_conversation_with_tools"));
+
         info!(
             "Continuing conversation with {} messages",
             conversation_history.len()
         );
+        span.set_attribute(KeyValue::new("llm.message_count", conversation_history.len() as i64));
+
         for (i, msg) in conversation_history.iter().enumerate() {
             match &msg.content {
                 Content::Text(text) => {
@@ -211,6 +253,8 @@ impl AIClient {
         }
 
         let tools = get_tool_definitions();
+        span.set_attribute(KeyValue::new("llm.tool_count", tools.len() as i64));
+
         let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history);
         req.tools = Some(tools);
 
@@ -218,8 +262,12 @@ impl AIClient {
             .client
             .chat_completion(req)
             .await
-            .map_err(|e| AIError {
-                message: format!("OpenAI API error: {}", e),
+            .map_err(|e| {
+                span.record_error(&e);
+                span.set_attribute(KeyValue::new("llm.error", e.to_string()));
+                AIError {
+                    message: format!("OpenAI API error: {}", e),
+                }
             })?;
 
         let choice = &result.choices[0];
@@ -235,6 +283,19 @@ impl AIClient {
             "Token Usage - Prompt: {}, Completion: {}, Total: {}",
             result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens
         );
+
+        // Add token usage attributes to span
+        span.set_attribute(KeyValue::new("llm.usage.prompt_tokens", result.usage.prompt_tokens as i64));
+        span.set_attribute(KeyValue::new("llm.usage.completion_tokens", result.usage.completion_tokens as i64));
+        span.set_attribute(KeyValue::new("llm.usage.total_tokens", result.usage.total_tokens as i64));
+        span.set_attribute(KeyValue::new("llm.response.has_content", content.is_some()));
+        span.set_attribute(KeyValue::new("llm.response.has_tool_calls", tool_calls.is_some()));
+
+        if let Some(ref calls) = tool_calls {
+            span.set_attribute(KeyValue::new("llm.response.tool_call_count", calls.len() as i64));
+        }
+
+        span.end();
 
         Ok(AgentResponse {
             content,

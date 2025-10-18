@@ -2,9 +2,12 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use log::{info, warn};
 use opentelemetry::global::{self, BoxedTracer};
-use opentelemetry::trace::{Span, SpanKind, Status, Tracer};
+use opentelemetry::trace::{Span, SpanKind, Tracer};
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::trace::SdkTracerProvider;
-use opentelemetry_stdout::SpanExporter;
+use opentelemetry_sdk::Resource;
+
 use std::fs;
 use std::io::Write;
 use std::sync::OnceLock;
@@ -120,11 +123,29 @@ fn get_tracer() -> &'static BoxedTracer {
     TRACER.get_or_init(|| global::tracer("iamcommitted"))
 }
 
-fn init_tracer_provider() {
-    let provider = SdkTracerProvider::builder()
-        .with_simple_exporter(SpanExporter::default())
-        .build();
-    global::set_tracer_provider(provider);
+fn get_tracer_provider() -> &'static SdkTracerProvider {
+    static TRACER_PROVIDER: OnceLock<SdkTracerProvider> = OnceLock::new();
+    TRACER_PROVIDER.get_or_init(|| {
+        let exporter = SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint("http://localhost:4317")
+            .build()
+            .expect("Failed to create span exporter");
+        let tracer_provider = SdkTracerProvider::builder()
+            .with_batch_exporter(exporter)
+            .with_resource(
+                Resource::builder()
+                    .with_attributes(vec![
+                        KeyValue::new("service.name", "iamcommitted"),
+                        KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+                    ])
+                    .build(),
+            )
+            .build();
+
+        global::set_tracer_provider(tracer_provider.clone());
+        tracer_provider
+    })
 }
 
 async fn generate_formatted_commit_message(
@@ -153,6 +174,9 @@ async fn generate_formatted_commit_message(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+    // Initialize tracer provider
+    let _tracer_provider = get_tracer_provider();
+
     let cli = Cli::parse();
 
     // Generate unique session ID
@@ -163,10 +187,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up logging with verbose flag if provided
     setup_logging(cli.verbose, &session_id)?;
 
-    let span = tracer
-        .span_builder(format!("{} {}", cli.verbose, &session_id))
+    let mut span = tracer
+        .span_builder(format!("session_{}", &session_id))
         .with_kind(SpanKind::Server)
         .start(tracer);
+
+    span.add_event("session-started", vec![]);
 
     info!("Session started with ID: {}", session_id);
 
@@ -192,6 +218,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "Commit source is '{}', skipping AI message generation.",
                         source
                     );
+                    span.end();
+                    let _ = get_tracer_provider().shutdown();
                     return Ok(());
                 }
             }
@@ -230,10 +258,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     eprintln!("Error generating commit message for hook: {}", e);
-                    // Propagate the error to potentially halt the commit process
+                    span.end();
+                    let _ = get_tracer_provider().shutdown();
                     return Err(e);
                 }
             }
+            span.end();
+            let _ = get_tracer_provider().shutdown();
             Ok(())
         }
         None => {
@@ -270,6 +301,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!(
                     "\n  Please stage your changes using 'git add' before running this command.\n"
                 );
+                span.end();
+                let _ = get_tracer_provider().shutdown();
                 return Ok(());
             }
 
@@ -312,6 +345,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             if num_result.is_err() {
                 println!("\n{} Please enter a valid number (1-3)\n", "❌".red());
+                span.end();
+                let _ = get_tracer_provider().shutdown();
                 return Ok(());
             }
 
@@ -338,6 +373,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     if !status.success() {
                         println!("\nFailed to edit commit message using nano");
+                        span.end();
+                        let _ = get_tracer_provider().shutdown();
                         return Ok(());
                     }
 
@@ -350,6 +387,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => {
                     info!("FAILURE - User cancelled commit");
                     println!("\nCommit cancelled\n");
+                    span.end();
+                    let _ = get_tracer_provider().shutdown();
                     return Ok(());
                 }
             };
@@ -360,6 +399,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .commit_with_details(&final_message)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
             }
+
+            span.end();
+            let _ = get_tracer_provider().shutdown();
             Ok(())
         }
     }
