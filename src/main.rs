@@ -1,8 +1,13 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use log::{info, warn};
+use opentelemetry::global::{self, BoxedTracer};
+use opentelemetry::trace::{Span, SpanKind, Status, Tracer};
+use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_stdout::SpanExporter;
 use std::fs;
 use std::io::Write;
+use std::sync::OnceLock;
 use std::{env, io, process::Command};
 use uuid::Uuid;
 
@@ -110,6 +115,18 @@ enum Commands {
     },
 }
 
+fn get_tracer() -> &'static BoxedTracer {
+    static TRACER: OnceLock<BoxedTracer> = OnceLock::new();
+    TRACER.get_or_init(|| global::tracer("iamcommitted"))
+}
+
+fn init_tracer_provider() {
+    let provider = SdkTracerProvider::builder()
+        .with_simple_exporter(SpanExporter::default())
+        .build();
+    global::set_tracer_provider(provider);
+}
+
 async fn generate_formatted_commit_message(
     git_client: &GitClient,
     ai_client: &mut AIClient,
@@ -141,8 +158,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Generate unique session ID
     let session_id = Uuid::new_v4().to_string();
 
+    let tracer = get_tracer();
+
     // Set up logging with verbose flag if provided
     setup_logging(cli.verbose, &session_id)?;
+
+    let span = tracer
+        .span_builder(format!("{} {}", cli.verbose, &session_id))
+        .with_kind(SpanKind::Server)
+        .start(tracer);
 
     info!("Session started with ID: {}", session_id);
 
