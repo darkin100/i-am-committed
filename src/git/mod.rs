@@ -25,15 +25,6 @@ impl GitClient {
         GitClient { working_dir: None }
     }
 
-    pub fn with_working_dir(dir: String) -> Self {
-        info!("GitClient::with_working_dir called with dir: {}", dir);
-        let client = GitClient {
-            working_dir: Some(dir),
-        };
-        info!("GitClient::with_working_dir completed");
-        client
-    }
-
     pub fn get_staged_changes(&self) -> Result<String, GitError> {
         info!("GitClient::get_staged_changes called");
         let output = self.run_git_command(&["diff", "--cached", "--diff-algorithm=minimal"])?;

@@ -2,7 +2,7 @@ use crate::ai::{AIClient, TokenUsage};
 use crate::git::GitClient;
 use crate::tools::executor::ToolExecutor;
 use log::{info, warn};
-use openai_api_rs::v1::chat_completion::{ChatCompletionMessage, Content, MessageRole, ToolCall};
+use openai_api_rs::v1::chat_completion::{ChatCompletionMessage, Content, MessageRole};
 
 #[derive(Debug)]
 pub struct AgentError {
@@ -35,11 +35,6 @@ impl<'a> Agent<'a> {
             git_client,
             max_iterations: 10,
         }
-    }
-
-    pub fn with_max_iterations(mut self, max: usize) -> Self {
-        self.max_iterations = max;
-        self
     }
 
     async fn build_initial_conversation_history(
@@ -252,9 +247,4 @@ impl<'a> Agent<'a> {
             ),
         })
     }
-}
-
-pub struct AgentResponse {
-    pub content: Option<String>,
-    pub tool_calls: Option<Vec<ToolCall>>,
 }

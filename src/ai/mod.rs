@@ -3,8 +3,9 @@ use crate::tools::get_tool_definitions;
 use log::{error, info};
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{
-    self, ChatCompletionMessage, ChatCompletionRequest, Content, MessageRole, ToolCall,
+    ChatCompletionMessage, Content, MessageRole, ToolCall,
 };
+use openai_api_rs::v1::chat_completion::chat_completion::ChatCompletionRequest;
 use openai_api_rs::v1::common::GPT4_O_MINI;
 use regex::Regex;
 use std::{env, fs};
@@ -130,7 +131,7 @@ impl AIClient {
             info!("System Prompt: {}", system_prompt);
             info!("User Prompt: {}", user_prompt);
 
-            let system_message = chat_completion::ChatCompletionMessage {
+            let system_message = ChatCompletionMessage {
                 role: MessageRole::system,
                 content: Content::Text(system_prompt.to_string()),
                 name: None,
@@ -138,7 +139,7 @@ impl AIClient {
                 tool_call_id: None,
             };
 
-            let user_message = chat_completion::ChatCompletionMessage {
+            let user_message = ChatCompletionMessage {
                 role: MessageRole::user,
                 content: Content::Text(user_prompt.to_string()),
                 name: None,
