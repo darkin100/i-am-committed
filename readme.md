@@ -29,6 +29,10 @@ Another interesting aspect of this project is that I am using it to generate my 
     - [Install Rust \& Cargo](#install-rust--cargo)
     - [Build and Install](#build-and-install)
     - [Running the Application from command line](#running-the-application-from-command-line)
+      - [Environment Variables Configuration](#environment-variables-configuration)
+        - [Option 1: Using OpenAI (default)](#option-1-using-openai-default)
+        - [Option 2: Using OpenRouter (free option available)](#option-2-using-openrouter-free-option-available)
+        - [Adding to your terminal profile](#adding-to-your-terminal-profile)
     - [Using as a `prepare-commit-msg` Hook](#using-as-a-prepare-commit-msg-hook)
       - [Installation](#installation)
       - [Usage](#usage)
@@ -199,10 +203,10 @@ You still need to have your API key configured for the hook to function correctl
 
 ## Unit Tests
 
-We have used Cline to generate unit tests, you can test them running the cargo command.
+To run unit tests without integration tests.
 
 ```sh
-cargo test
+cargo test tests
 ```
 
 ### References
