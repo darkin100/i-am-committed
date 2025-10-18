@@ -1,4 +1,5 @@
-use openai_api_rs::v1::chat_completion::{Tool, ToolType};
+use openai_api_rs::v1::chat_completion::Tool;
+use openai_api_rs::v1::chat_completion::ToolType;
 use openai_api_rs::v1::types::{Function, FunctionParameters, JSONSchemaDefine, JSONSchemaType};
 use std::collections::HashMap;
 

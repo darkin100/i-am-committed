@@ -37,6 +37,13 @@ impl<'a> Agent<'a> {
         }
     }
 
+    /// Sets the maximum number of iterations for the agent loop (primarily for testing)
+    #[allow(dead_code)]
+    pub fn with_max_iterations(mut self, max: usize) -> Self {
+        self.max_iterations = max;
+        self
+    }
+
     async fn build_initial_conversation_history(
         &self,
     ) -> Result<Vec<ChatCompletionMessage>, AgentError> {
