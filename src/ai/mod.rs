@@ -127,14 +127,10 @@ impl AIClient {
             .with_kind(SpanKind::Client)
             .start_with_context(&tracer, &parent_cx);
 
-        // OpenInference semantic conventions
+        // OpenInference semantic conventions - REQUIRED attributes
         span.set_attribute(KeyValue::new("openinference.span.kind", OPENINFERENCE_SPAN_KIND_LLM));
-        span.set_attribute(KeyValue::new("llm.request.model", self.model.clone()));
         span.set_attribute(KeyValue::new("llm.system", LLM_SYSTEM_OPENAI));
-        span.set_attribute(KeyValue::new(
-            "llm.operation_name",
-            "generate_commit_message_with_tools",
-        ));
+        span.set_attribute(KeyValue::new("llm.model_name", self.model.clone()));
 
         // Load and parse prompts from config
         let prompts_md = self.config.load_prompts().map_err(|e| {
@@ -143,6 +139,7 @@ impl AIClient {
             };
             span.record_error_detailed(&ai_error);
             span.set_status(Status::error(e.to_string()));
+            span.set_attribute(KeyValue::new("exception.message", e.to_string()));
             span.end();
             ai_error
         })?;
@@ -206,21 +203,36 @@ impl AIClient {
             "Sending chat completion request with {} messages",
             conversation_history.len()
         );
-        span.set_attribute(KeyValue::new(
-            "llm.input_messages.count",
-            conversation_history.len() as i64,
-        ));
 
-        // Add input messages to span for Phoenix
-        if let Ok(messages_json) = serde_json::to_string(&conversation_history) {
-            span.set_attribute(KeyValue::new("llm.input_messages", messages_json));
-        }
+        // Set flattened input messages according to OpenInference spec
+        crate::openinference::set_input_messages(&mut span, &conversation_history);
 
         let tools = get_tool_definitions();
-        span.set_attribute(KeyValue::new("llm.tools.count", tools.len() as i64));
 
-        let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history);
+        // Set flattened tools according to OpenInference spec
+        crate::openinference::set_tools(&mut span, &tools);
+
+        let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history.clone());
         req.tools = Some(tools);
+
+        // Set invocation parameters according to OpenInference spec
+        let invocation_params = serde_json::json!({
+            "model": self.model,
+            "tools": req.tools.is_some(),
+        });
+        if let Ok(params_json) = serde_json::to_string(&invocation_params) {
+            span.set_attribute(KeyValue::new("llm.invocation_parameters", params_json));
+        }
+
+        // Set input.value with the raw request
+        let input_value = serde_json::json!({
+            "model": self.model,
+            "messages": conversation_history,
+        });
+        if let Ok(input_json) = serde_json::to_string(&input_value) {
+            span.set_attribute(KeyValue::new("input.value", input_json));
+            span.set_attribute(KeyValue::new("input.mime_type", "application/json"));
+        }
 
         let result = self.client.chat_completion(req).await.map_err(|e| {
             let ai_error = AIError {
@@ -228,7 +240,7 @@ impl AIClient {
             };
             span.record_error_detailed(&ai_error);
             span.set_status(Status::error(e.to_string()));
-            span.set_attribute(KeyValue::new("llm.error", e.to_string()));
+            span.set_attribute(KeyValue::new("exception.message", e.to_string()));
             span.end();
             ai_error
         })?;
@@ -247,17 +259,24 @@ impl AIClient {
             result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens
         );
 
-        // Add output message to span for Phoenix
-        if let Ok(output_json) = serde_json::to_string(&choice.message) {
-            span.set_attribute(KeyValue::new("llm.output_messages", output_json));
+        // Set flattened output messages according to OpenInference spec
+        crate::openinference::set_output_message(&mut span, &choice.message);
+
+        // Set output.value with the raw response
+        let output_value = serde_json::json!({
+            "id": result.id,
+            "object": result.object,
+            "created": result.created,
+            "model": result.model,
+            "choices": result.choices,
+            "usage": result.usage,
+        });
+        if let Ok(output_json) = serde_json::to_string(&output_value) {
+            span.set_attribute(KeyValue::new("output.value", output_json));
+            span.set_attribute(KeyValue::new("output.mime_type", "application/json"));
         }
 
-        // Add response content if available
-        if let Some(ref text) = content {
-            span.set_attribute(KeyValue::new("llm.response.content", text.clone()));
-        }
-
-        // Add token usage attributes to span using OpenInference conventions
+        // Set token usage attributes according to OpenInference spec
         span.set_attribute(KeyValue::new(
             "llm.token_count.prompt",
             result.usage.prompt_tokens as i64,
@@ -270,18 +289,6 @@ impl AIClient {
             "llm.token_count.total",
             result.usage.total_tokens as i64,
         ));
-        span.set_attribute(KeyValue::new("llm.response.has_content", content.is_some()));
-        span.set_attribute(KeyValue::new(
-            "llm.response.has_tool_calls",
-            tool_calls.is_some(),
-        ));
-
-        if let Some(ref calls) = tool_calls {
-            span.set_attribute(KeyValue::new(
-                "llm.output_messages.tool_calls.count",
-                calls.len() as i64,
-            ));
-        }
 
         span.set_status(Status::Ok);
         span.end();
@@ -310,28 +317,18 @@ impl AIClient {
             .with_kind(SpanKind::Client)
             .start_with_context(&tracer, &parent_cx);
 
-        // OpenInference semantic conventions
+        // OpenInference semantic conventions - REQUIRED attributes
         span.set_attribute(KeyValue::new("openinference.span.kind", OPENINFERENCE_SPAN_KIND_LLM));
-        span.set_attribute(KeyValue::new("llm.request.model", self.model.clone()));
         span.set_attribute(KeyValue::new("llm.system", LLM_SYSTEM_OPENAI));
-        span.set_attribute(KeyValue::new(
-            "llm.operation_name",
-            "continue_conversation_with_tools",
-        ));
+        span.set_attribute(KeyValue::new("llm.model_name", self.model.clone()));
 
         info!(
             "Continuing conversation with {} messages",
             conversation_history.len()
         );
-        span.set_attribute(KeyValue::new(
-            "llm.input_messages.count",
-            conversation_history.len() as i64,
-        ));
 
-        // Add input messages to span for Phoenix
-        if let Ok(messages_json) = serde_json::to_string(&conversation_history) {
-            span.set_attribute(KeyValue::new("llm.input_messages", messages_json));
-        }
+        // Set flattened input messages according to OpenInference spec
+        crate::openinference::set_input_messages(&mut span, &conversation_history);
 
         for (i, msg) in conversation_history.iter().enumerate() {
             match &msg.content {
@@ -345,10 +342,31 @@ impl AIClient {
         }
 
         let tools = get_tool_definitions();
-        span.set_attribute(KeyValue::new("llm.tools.count", tools.len() as i64));
 
-        let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history);
+        // Set flattened tools according to OpenInference spec
+        crate::openinference::set_tools(&mut span, &tools);
+
+        let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history.clone());
         req.tools = Some(tools);
+
+        // Set invocation parameters according to OpenInference spec
+        let invocation_params = serde_json::json!({
+            "model": self.model,
+            "tools": req.tools.is_some(),
+        });
+        if let Ok(params_json) = serde_json::to_string(&invocation_params) {
+            span.set_attribute(KeyValue::new("llm.invocation_parameters", params_json));
+        }
+
+        // Set input.value with the raw request
+        let input_value = serde_json::json!({
+            "model": self.model,
+            "messages": conversation_history,
+        });
+        if let Ok(input_json) = serde_json::to_string(&input_value) {
+            span.set_attribute(KeyValue::new("input.value", input_json));
+            span.set_attribute(KeyValue::new("input.mime_type", "application/json"));
+        }
 
         let result = self.client.chat_completion(req).await.map_err(|e| {
             let ai_error = AIError {
@@ -356,7 +374,7 @@ impl AIClient {
             };
             span.record_error_detailed(&ai_error);
             span.set_status(Status::error(e.to_string()));
-            span.set_attribute(KeyValue::new("llm.error", e.to_string()));
+            span.set_attribute(KeyValue::new("exception.message", e.to_string()));
             span.end();
             ai_error
         })?;
@@ -375,17 +393,24 @@ impl AIClient {
             result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens
         );
 
-        // Add output message to span for Phoenix
-        if let Ok(output_json) = serde_json::to_string(&choice.message) {
-            span.set_attribute(KeyValue::new("llm.output_messages", output_json));
+        // Set flattened output messages according to OpenInference spec
+        crate::openinference::set_output_message(&mut span, &choice.message);
+
+        // Set output.value with the raw response
+        let output_value = serde_json::json!({
+            "id": result.id,
+            "object": result.object,
+            "created": result.created,
+            "model": result.model,
+            "choices": result.choices,
+            "usage": result.usage,
+        });
+        if let Ok(output_json) = serde_json::to_string(&output_value) {
+            span.set_attribute(KeyValue::new("output.value", output_json));
+            span.set_attribute(KeyValue::new("output.mime_type", "application/json"));
         }
 
-        // Add response content if available
-        if let Some(ref text) = content {
-            span.set_attribute(KeyValue::new("llm.response.content", text.clone()));
-        }
-
-        // Add token usage attributes to span using OpenInference conventions
+        // Set token usage attributes according to OpenInference spec
         span.set_attribute(KeyValue::new(
             "llm.token_count.prompt",
             result.usage.prompt_tokens as i64,
@@ -398,18 +423,6 @@ impl AIClient {
             "llm.token_count.total",
             result.usage.total_tokens as i64,
         ));
-        span.set_attribute(KeyValue::new("llm.response.has_content", content.is_some()));
-        span.set_attribute(KeyValue::new(
-            "llm.response.has_tool_calls",
-            tool_calls.is_some(),
-        ));
-
-        if let Some(ref calls) = tool_calls {
-            span.set_attribute(KeyValue::new(
-                "llm.output_messages.tool_calls.count",
-                calls.len() as i64,
-            ));
-        }
 
         span.set_status(Status::Ok);
         span.end();

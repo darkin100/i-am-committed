@@ -119,7 +119,7 @@ impl<'a> Agent<'a> {
             .with_kind(SpanKind::Internal)
             .start_with_context(&tracer, &parent_cx);
 
-        // OpenInference semantic conventions
+        // OpenInference semantic conventions - REQUIRED attributes
         agent_span.set_attribute(KeyValue::new(
             "openinference.span.kind",
             OPENINFERENCE_SPAN_KIND_AGENT,
@@ -128,6 +128,12 @@ impl<'a> Agent<'a> {
             "agent.max_iterations",
             self.max_iterations as i64,
         ));
+        agent_span.set_attribute(KeyValue::new("agent.name", "commit_message_generator"));
+
+        // Set input value for agent according to OpenInference spec
+        let input_description = "Generate a commit message from staged git changes";
+        agent_span.set_attribute(KeyValue::new("input.value", input_description));
+        agent_span.set_attribute(KeyValue::new("input.mime_type", "text/plain"));
 
         // Attach span to context for nested operations
         let agent_cx = parent_cx.with_span(agent_span);
@@ -188,6 +194,9 @@ impl<'a> Agent<'a> {
                     "agent.token_usage.total",
                     total_token_usage.total_tokens as i64,
                 ));
+                // Set output value according to OpenInference spec
+                agent_span_ref.set_attribute(KeyValue::new("output.value", content.clone()));
+                agent_span_ref.set_attribute(KeyValue::new("output.mime_type", "text/plain"));
                 agent_span_ref.set_status(Status::Ok);
                 agent_span_ref.end();
                 return Ok(CommitMessageResult {
@@ -197,8 +206,8 @@ impl<'a> Agent<'a> {
             }
             agent_span_ref.set_attribute(KeyValue::new("agent.success", false));
             agent_span_ref.set_attribute(KeyValue::new(
-                "agent.error",
-                "no_content_or_tool_calls",
+                "exception.message",
+                "No content or tool calls in response",
             ));
             agent_span_ref.set_status(Status::error("No content or tool calls in response"));
             agent_span_ref.end();
@@ -290,6 +299,9 @@ impl<'a> Agent<'a> {
                         "agent.token_usage.total",
                         total_token_usage.total_tokens as i64,
                     ));
+                    // Set output value according to OpenInference spec
+                    agent_span_ref.set_attribute(KeyValue::new("output.value", content.clone()));
+                    agent_span_ref.set_attribute(KeyValue::new("output.mime_type", "text/plain"));
                     agent_span_ref.set_status(Status::Ok);
                     agent_span_ref.end();
                     return Ok(CommitMessageResult {
@@ -298,7 +310,7 @@ impl<'a> Agent<'a> {
                     });
                 }
                 agent_span_ref.set_attribute(KeyValue::new("agent.success", false));
-                agent_span_ref.set_attribute(KeyValue::new("agent.error", "no_content_in_final_response"));
+                agent_span_ref.set_attribute(KeyValue::new("exception.message", "No content in final response"));
                 agent_span_ref.set_status(Status::error("No content in final response"));
                 agent_span_ref.end();
                 return Err(AgentError {
@@ -313,7 +325,10 @@ impl<'a> Agent<'a> {
         );
         agent_span_ref.set_attribute(KeyValue::new("agent.iterations_used", iteration as i64));
         agent_span_ref.set_attribute(KeyValue::new("agent.success", false));
-        agent_span_ref.set_attribute(KeyValue::new("agent.error", "max_iterations_exceeded"));
+        agent_span_ref.set_attribute(KeyValue::new(
+            "exception.message",
+            format!("Agent loop exceeded maximum iterations ({})", self.max_iterations),
+        ));
         agent_span_ref.set_status(Status::error("Max iterations exceeded"));
         agent_span_ref.end();
         Err(AgentError {

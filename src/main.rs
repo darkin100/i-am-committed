@@ -48,6 +48,7 @@ mod ai;
 mod commit_formatter;
 mod config;
 mod git;
+mod openinference;
 mod tools;
 
 use crate::agent::{Agent, CommitMessageResult};
@@ -227,7 +228,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut span = tracer
         .span_builder(format!("session_{}", &session_id))
-        .with_kind(SpanKind::Server)
+        .with_kind(SpanKind::Client)
         .start(tracer);
 
     span.set_attribute(KeyValue::new("session.id", session_id.clone()));
@@ -242,10 +243,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     span.add_event(
         "session.started",
-        vec![KeyValue::new(
-            "timestamp",
-            chrono::Utc::now().to_rfc3339(),
-        )],
+        vec![KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339())],
     );
 
     info!("Session started with ID: {}", session_id);
@@ -278,10 +276,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     );
                     cx.span().add_event(
                         "session.ended",
-                        vec![KeyValue::new(
-                            "timestamp",
-                            chrono::Utc::now().to_rfc3339(),
-                        )],
+                        vec![KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339())],
                     );
                     cx.span().end();
                     shutdown_tracing();
@@ -337,10 +332,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             cx.span().add_event(
                 "session.ended",
-                vec![KeyValue::new(
-                    "timestamp",
-                    chrono::Utc::now().to_rfc3339(),
-                )],
+                vec![KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339())],
             );
             cx.span().end();
             shutdown_tracing();
