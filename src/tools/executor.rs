@@ -1,6 +1,12 @@
 use crate::git::GitClient;
 use log::info;
+use opentelemetry::global;
+use opentelemetry::trace::{Span, SpanKind, Status, TraceContextExt, Tracer};
+use opentelemetry::{Context, KeyValue};
 use serde_json::Value;
+
+// OpenInference semantic conventions
+const OPENINFERENCE_SPAN_KIND_TOOL: &str = "TOOL";
 
 #[derive(Debug)]
 pub struct ToolExecutionError {
@@ -29,6 +35,33 @@ impl<'a> ToolExecutor<'a> {
         tool_name: &str,
         arguments: &Value,
     ) -> Result<String, ToolExecutionError> {
+        let tracer = global::tracer("iamcommitted");
+
+        // Create tool span as child of current context
+        let parent_cx = Context::current();
+        let mut tool_span = tracer
+            .span_builder(format!("tool.{}", tool_name))
+            .with_kind(SpanKind::Internal)
+            .start_with_context(&tracer, &parent_cx);
+
+        // OpenInference semantic conventions
+        tool_span.set_attribute(KeyValue::new(
+            "openinference.span.kind",
+            OPENINFERENCE_SPAN_KIND_TOOL,
+        ));
+        tool_span.set_attribute(KeyValue::new("tool.name", tool_name.to_string()));
+
+        // Add tool parameters as JSON
+        if let Ok(args_str) = serde_json::to_string(arguments) {
+            tool_span.set_attribute(KeyValue::new("tool.parameters", args_str));
+        }
+
+        // Attach span to context for nested operations
+        let tool_cx = Context::current_with_span(tool_span);
+        let tool_cx_clone = tool_cx.clone();
+        let tool_span_ref = tool_cx_clone.span();
+        let _guard = tool_cx.attach();
+
         info!(
             "Executing tool: {} with arguments: {}",
             tool_name, arguments
@@ -47,13 +80,24 @@ impl<'a> ToolExecutor<'a> {
         };
 
         match &result {
-            Ok(output) => info!(
-                "Tool execution successful. Output length: {} chars",
-                output.len()
-            ),
-            Err(e) => info!("Tool execution failed: {}", e),
+            Ok(output) => {
+                info!(
+                    "Tool execution successful. Output length: {} chars",
+                    output.len()
+                );
+                tool_span_ref.set_attribute(KeyValue::new("tool.success", true));
+                tool_span_ref.set_attribute(KeyValue::new("tool.output_length", output.len() as i64));
+                tool_span_ref.set_status(Status::Ok);
+            }
+            Err(e) => {
+                info!("Tool execution failed: {}", e);
+                tool_span_ref.set_attribute(KeyValue::new("tool.success", false));
+                tool_span_ref.set_attribute(KeyValue::new("tool.error", e.to_string()));
+                tool_span_ref.set_status(Status::error(e.to_string()));
+            }
         }
 
+        tool_span_ref.end();
         result
     }
 

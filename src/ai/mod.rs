@@ -6,10 +6,31 @@ use openai_api_rs::v1::chat_completion::chat_completion::ChatCompletionRequest;
 use openai_api_rs::v1::chat_completion::{ChatCompletionMessage, Content, MessageRole, ToolCall};
 use openai_api_rs::v1::common::GPT4_O_MINI;
 use opentelemetry::global;
-use opentelemetry::trace::{Span, SpanKind, Tracer};
-use opentelemetry::KeyValue;
+use opentelemetry::trace::{Span, SpanKind, Status, Tracer};
+use opentelemetry::{Context, KeyValue};
 use regex::Regex;
+use serde_json;
 use std::{env, fs};
+
+// OpenInference semantic conventions
+const OPENINFERENCE_SPAN_KIND_LLM: &str = "LLM";
+const LLM_SYSTEM_OPENAI: &str = "openai";
+
+/// Helper trait for detailed error tracking in spans
+trait SpanErrorExt {
+    fn record_error_detailed(&mut self, error: &dyn std::error::Error);
+}
+
+impl<T: Span> SpanErrorExt for T {
+    fn record_error_detailed(&mut self, error: &dyn std::error::Error) {
+        self.record_error(error);
+        self.set_attribute(KeyValue::new("error.type", error.to_string()));
+        self.set_attribute(KeyValue::new("error.message", error.to_string()));
+        if let Some(source) = error.source() {
+            self.set_attribute(KeyValue::new("error.source", source.to_string()));
+        }
+    }
+}
 
 pub struct AIClient {
     client: OpenAIClient,
@@ -98,23 +119,44 @@ impl AIClient {
         mut conversation_history: Vec<ChatCompletionMessage>,
     ) -> Result<AgentResponse, AIError> {
         let tracer = global::tracer("iamcommitted");
+
+        // Create span as child of current context
+        let parent_cx = Context::current();
         let mut span = tracer
             .span_builder("llm.chat_completion")
             .with_kind(SpanKind::Client)
-            .start(&tracer);
+            .start_with_context(&tracer, &parent_cx);
 
-        span.set_attribute(KeyValue::new("llm.model", self.model.clone()));
-        span.set_attribute(KeyValue::new("llm.operation", "generate_commit_message_with_tools"));
+        // OpenInference semantic conventions
+        span.set_attribute(KeyValue::new("openinference.span.kind", OPENINFERENCE_SPAN_KIND_LLM));
+        span.set_attribute(KeyValue::new("llm.request.model", self.model.clone()));
+        span.set_attribute(KeyValue::new("llm.system", LLM_SYSTEM_OPENAI));
+        span.set_attribute(KeyValue::new(
+            "llm.operation_name",
+            "generate_commit_message_with_tools",
+        ));
 
         // Load and parse prompts from config
-        let prompts_md = self.config.load_prompts().map_err(|e| AIError {
-            message: format!("Failed to load prompts: {}", e),
+        let prompts_md = self.config.load_prompts().map_err(|e| {
+            let ai_error = AIError {
+                message: format!("Failed to load prompts: {}", e),
+            };
+            span.record_error_detailed(&ai_error);
+            span.set_status(Status::error(e.to_string()));
+            span.end();
+            ai_error
         })?;
 
         // Extract system prompt
         let system_re =
-            Regex::new(r"(?s)## System Prompt\n\n(.*?)## User Prompt").map_err(|e| AIError {
-                message: format!("Failed to compile system prompt regex: {}", e),
+            Regex::new(r"(?s)## System Prompt\n\n(.*?)## User Prompt").map_err(|e| {
+                let ai_error = AIError {
+                    message: format!("Failed to compile system prompt regex: {}", e),
+                };
+                span.record_error_detailed(&ai_error);
+                span.set_status(Status::error(e.to_string()));
+                span.end();
+                ai_error
             })?;
         let system_prompt = system_re
             .captures(&prompts_md)
@@ -164,25 +206,32 @@ impl AIClient {
             "Sending chat completion request with {} messages",
             conversation_history.len()
         );
-        span.set_attribute(KeyValue::new("llm.message_count", conversation_history.len() as i64));
+        span.set_attribute(KeyValue::new(
+            "llm.input_messages.count",
+            conversation_history.len() as i64,
+        ));
+
+        // Add input messages to span for Phoenix
+        if let Ok(messages_json) = serde_json::to_string(&conversation_history) {
+            span.set_attribute(KeyValue::new("llm.input_messages", messages_json));
+        }
 
         let tools = get_tool_definitions();
-        span.set_attribute(KeyValue::new("llm.tool_count", tools.len() as i64));
+        span.set_attribute(KeyValue::new("llm.tools.count", tools.len() as i64));
 
         let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history);
         req.tools = Some(tools);
 
-        let result = self
-            .client
-            .chat_completion(req)
-            .await
-            .map_err(|e| {
-                span.record_error(&e);
-                span.set_attribute(KeyValue::new("llm.error", e.to_string()));
-                AIError {
-                    message: format!("OpenAI API error: {}", e),
-                }
-            })?;
+        let result = self.client.chat_completion(req).await.map_err(|e| {
+            let ai_error = AIError {
+                message: format!("OpenAI API error: {}", e),
+            };
+            span.record_error_detailed(&ai_error);
+            span.set_status(Status::error(e.to_string()));
+            span.set_attribute(KeyValue::new("llm.error", e.to_string()));
+            span.end();
+            ai_error
+        })?;
 
         let choice = &result.choices[0];
         let content = choice.message.content.clone();
@@ -198,17 +247,43 @@ impl AIClient {
             result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens
         );
 
-        // Add token usage attributes to span
-        span.set_attribute(KeyValue::new("llm.usage.prompt_tokens", result.usage.prompt_tokens as i64));
-        span.set_attribute(KeyValue::new("llm.usage.completion_tokens", result.usage.completion_tokens as i64));
-        span.set_attribute(KeyValue::new("llm.usage.total_tokens", result.usage.total_tokens as i64));
-        span.set_attribute(KeyValue::new("llm.response.has_content", content.is_some()));
-        span.set_attribute(KeyValue::new("llm.response.has_tool_calls", tool_calls.is_some()));
-
-        if let Some(ref calls) = tool_calls {
-            span.set_attribute(KeyValue::new("llm.response.tool_call_count", calls.len() as i64));
+        // Add output message to span for Phoenix
+        if let Ok(output_json) = serde_json::to_string(&choice.message) {
+            span.set_attribute(KeyValue::new("llm.output_messages", output_json));
         }
 
+        // Add response content if available
+        if let Some(ref text) = content {
+            span.set_attribute(KeyValue::new("llm.response.content", text.clone()));
+        }
+
+        // Add token usage attributes to span using OpenInference conventions
+        span.set_attribute(KeyValue::new(
+            "llm.token_count.prompt",
+            result.usage.prompt_tokens as i64,
+        ));
+        span.set_attribute(KeyValue::new(
+            "llm.token_count.completion",
+            result.usage.completion_tokens as i64,
+        ));
+        span.set_attribute(KeyValue::new(
+            "llm.token_count.total",
+            result.usage.total_tokens as i64,
+        ));
+        span.set_attribute(KeyValue::new("llm.response.has_content", content.is_some()));
+        span.set_attribute(KeyValue::new(
+            "llm.response.has_tool_calls",
+            tool_calls.is_some(),
+        ));
+
+        if let Some(ref calls) = tool_calls {
+            span.set_attribute(KeyValue::new(
+                "llm.output_messages.tool_calls.count",
+                calls.len() as i64,
+            ));
+        }
+
+        span.set_status(Status::Ok);
         span.end();
 
         Ok(AgentResponse {
@@ -227,19 +302,36 @@ impl AIClient {
         conversation_history: Vec<ChatCompletionMessage>,
     ) -> Result<AgentResponse, AIError> {
         let tracer = global::tracer("iamcommitted");
+
+        // Create span as child of current context
+        let parent_cx = Context::current();
         let mut span = tracer
             .span_builder("llm.chat_completion")
             .with_kind(SpanKind::Client)
-            .start(&tracer);
+            .start_with_context(&tracer, &parent_cx);
 
-        span.set_attribute(KeyValue::new("llm.model", self.model.clone()));
-        span.set_attribute(KeyValue::new("llm.operation", "continue_conversation_with_tools"));
+        // OpenInference semantic conventions
+        span.set_attribute(KeyValue::new("openinference.span.kind", OPENINFERENCE_SPAN_KIND_LLM));
+        span.set_attribute(KeyValue::new("llm.request.model", self.model.clone()));
+        span.set_attribute(KeyValue::new("llm.system", LLM_SYSTEM_OPENAI));
+        span.set_attribute(KeyValue::new(
+            "llm.operation_name",
+            "continue_conversation_with_tools",
+        ));
 
         info!(
             "Continuing conversation with {} messages",
             conversation_history.len()
         );
-        span.set_attribute(KeyValue::new("llm.message_count", conversation_history.len() as i64));
+        span.set_attribute(KeyValue::new(
+            "llm.input_messages.count",
+            conversation_history.len() as i64,
+        ));
+
+        // Add input messages to span for Phoenix
+        if let Ok(messages_json) = serde_json::to_string(&conversation_history) {
+            span.set_attribute(KeyValue::new("llm.input_messages", messages_json));
+        }
 
         for (i, msg) in conversation_history.iter().enumerate() {
             match &msg.content {
@@ -253,22 +345,21 @@ impl AIClient {
         }
 
         let tools = get_tool_definitions();
-        span.set_attribute(KeyValue::new("llm.tool_count", tools.len() as i64));
+        span.set_attribute(KeyValue::new("llm.tools.count", tools.len() as i64));
 
         let mut req = ChatCompletionRequest::new(self.model.clone(), conversation_history);
         req.tools = Some(tools);
 
-        let result = self
-            .client
-            .chat_completion(req)
-            .await
-            .map_err(|e| {
-                span.record_error(&e);
-                span.set_attribute(KeyValue::new("llm.error", e.to_string()));
-                AIError {
-                    message: format!("OpenAI API error: {}", e),
-                }
-            })?;
+        let result = self.client.chat_completion(req).await.map_err(|e| {
+            let ai_error = AIError {
+                message: format!("OpenAI API error: {}", e),
+            };
+            span.record_error_detailed(&ai_error);
+            span.set_status(Status::error(e.to_string()));
+            span.set_attribute(KeyValue::new("llm.error", e.to_string()));
+            span.end();
+            ai_error
+        })?;
 
         let choice = &result.choices[0];
         let content = choice.message.content.clone();
@@ -284,17 +375,43 @@ impl AIClient {
             result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.total_tokens
         );
 
-        // Add token usage attributes to span
-        span.set_attribute(KeyValue::new("llm.usage.prompt_tokens", result.usage.prompt_tokens as i64));
-        span.set_attribute(KeyValue::new("llm.usage.completion_tokens", result.usage.completion_tokens as i64));
-        span.set_attribute(KeyValue::new("llm.usage.total_tokens", result.usage.total_tokens as i64));
-        span.set_attribute(KeyValue::new("llm.response.has_content", content.is_some()));
-        span.set_attribute(KeyValue::new("llm.response.has_tool_calls", tool_calls.is_some()));
-
-        if let Some(ref calls) = tool_calls {
-            span.set_attribute(KeyValue::new("llm.response.tool_call_count", calls.len() as i64));
+        // Add output message to span for Phoenix
+        if let Ok(output_json) = serde_json::to_string(&choice.message) {
+            span.set_attribute(KeyValue::new("llm.output_messages", output_json));
         }
 
+        // Add response content if available
+        if let Some(ref text) = content {
+            span.set_attribute(KeyValue::new("llm.response.content", text.clone()));
+        }
+
+        // Add token usage attributes to span using OpenInference conventions
+        span.set_attribute(KeyValue::new(
+            "llm.token_count.prompt",
+            result.usage.prompt_tokens as i64,
+        ));
+        span.set_attribute(KeyValue::new(
+            "llm.token_count.completion",
+            result.usage.completion_tokens as i64,
+        ));
+        span.set_attribute(KeyValue::new(
+            "llm.token_count.total",
+            result.usage.total_tokens as i64,
+        ));
+        span.set_attribute(KeyValue::new("llm.response.has_content", content.is_some()));
+        span.set_attribute(KeyValue::new(
+            "llm.response.has_tool_calls",
+            tool_calls.is_some(),
+        ));
+
+        if let Some(ref calls) = tool_calls {
+            span.set_attribute(KeyValue::new(
+                "llm.output_messages.tool_calls.count",
+                calls.len() as i64,
+            ));
+        }
+
+        span.set_status(Status::Ok);
         span.end();
 
         Ok(AgentResponse {

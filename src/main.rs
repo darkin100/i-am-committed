@@ -2,11 +2,12 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use log::{info, warn};
 use opentelemetry::global::{self, BoxedTracer};
-use opentelemetry::trace::{Span, SpanKind, Tracer};
-use opentelemetry::KeyValue;
+use opentelemetry::trace::{Span, SpanKind, TraceContextExt, Tracer};
+use opentelemetry::{Context, KeyValue};
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
-use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_sdk::trace::{BatchConfigBuilder, BatchSpanProcessor, SdkTracerProvider};
 use opentelemetry_sdk::Resource;
+use std::time::Duration;
 
 use std::fs;
 use std::io::Write;
@@ -126,18 +127,39 @@ fn get_tracer() -> &'static BoxedTracer {
 fn get_tracer_provider() -> &'static SdkTracerProvider {
     static TRACER_PROVIDER: OnceLock<SdkTracerProvider> = OnceLock::new();
     TRACER_PROVIDER.get_or_init(|| {
+        // Make OTLP endpoint configurable - IAC_OTEL_ENDPOINT takes precedence
+        let endpoint = env::var("IAC_OTEL_ENDPOINT")
+            .or_else(|_| env::var("OTEL_EXPORTER_OTLP_ENDPOINT"))
+            .unwrap_or_else(|_| "http://localhost:4317".to_string());
+
+        info!("Using OTLP endpoint: {}", endpoint);
+
         let exporter = SpanExporter::builder()
             .with_tonic()
-            .with_endpoint("http://localhost:4317")
+            .with_endpoint(endpoint)
             .build()
             .expect("Failed to create span exporter");
+
+        // Configure batch processor with shorter timeouts for CLI apps
+        // CLI apps exit quickly, so we need aggressive batching settings
+        let batch_config = BatchConfigBuilder::default()
+            .with_max_queue_size(2048)
+            .with_scheduled_delay(Duration::from_millis(100)) // Export every 100ms instead of default 5s
+            // Note: max_export_timeout requires experimental feature flag, using default
+            .build();
+
+        let batch_processor = BatchSpanProcessor::builder(exporter)
+            .with_batch_config(batch_config)
+            .build();
+
         let tracer_provider = SdkTracerProvider::builder()
-            .with_batch_exporter(exporter)
+            .with_span_processor(batch_processor)
             .with_resource(
                 Resource::builder()
                     .with_attributes(vec![
                         KeyValue::new("service.name", "iamcommitted"),
                         KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+                        KeyValue::new("openinference.project.name", "iamcommitted"),
                     ])
                     .build(),
             )
@@ -146,6 +168,22 @@ fn get_tracer_provider() -> &'static SdkTracerProvider {
         global::set_tracer_provider(tracer_provider.clone());
         tracer_provider
     })
+}
+
+/// Properly shutdown the tracer provider to ensure all spans are exported
+fn shutdown_tracing() {
+    info!("Shutting down tracing and flushing spans...");
+
+    // Force flush to ensure all pending spans are exported
+    if let Err(e) = get_tracer_provider().force_flush() {
+        eprintln!("Failed to flush traces: {:?}", e);
+    }
+
+    // Shutdown the tracer provider directly
+    // Note: shutdown() returns a Result<(), TraceError>
+    if let Err(e) = get_tracer_provider().shutdown() {
+        eprintln!("Failed to shutdown tracer provider: {:?}", e);
+    }
 }
 
 async fn generate_formatted_commit_message(
@@ -192,9 +230,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_kind(SpanKind::Server)
         .start(tracer);
 
-    span.add_event("session-started", vec![]);
+    span.set_attribute(KeyValue::new("session.id", session_id.clone()));
+    span.set_attribute(KeyValue::new("app.version", VERSION));
+    span.set_attribute(KeyValue::new(
+        "session.mode",
+        if cli.command.is_some() {
+            "hook"
+        } else {
+            "interactive"
+        },
+    ));
+    span.add_event(
+        "session.started",
+        vec![KeyValue::new(
+            "timestamp",
+            chrono::Utc::now().to_rfc3339(),
+        )],
+    );
 
     info!("Session started with ID: {}", session_id);
+
+    // Create a context with this span as the active span and attach it
+    let cx = Context::current_with_span(span);
+    let _guard = cx.clone().attach();
 
     if cli.verbose {
         println!("Verbose mode enabled. Logs will be printed to console.");
@@ -218,8 +276,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "Commit source is '{}', skipping AI message generation.",
                         source
                     );
-                    span.end();
-                    let _ = get_tracer_provider().shutdown();
+                    cx.span().add_event(
+                        "session.ended",
+                        vec![KeyValue::new(
+                            "timestamp",
+                            chrono::Utc::now().to_rfc3339(),
+                        )],
+                    );
+                    cx.span().end();
+                    shutdown_tracing();
                     return Ok(());
                 }
             }
@@ -258,13 +323,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     eprintln!("Error generating commit message for hook: {}", e);
-                    span.end();
-                    let _ = get_tracer_provider().shutdown();
+                    cx.span().add_event(
+                        "session.ended",
+                        vec![
+                            KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
+                            KeyValue::new("error", true),
+                        ],
+                    );
+                    cx.span().end();
+                    shutdown_tracing();
                     return Err(e);
                 }
             }
-            span.end();
-            let _ = get_tracer_provider().shutdown();
+            cx.span().add_event(
+                "session.ended",
+                vec![KeyValue::new(
+                    "timestamp",
+                    chrono::Utc::now().to_rfc3339(),
+                )],
+            );
+            cx.span().end();
+            shutdown_tracing();
             Ok(())
         }
         None => {
@@ -301,8 +380,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!(
                     "\n  Please stage your changes using 'git add' before running this command.\n"
                 );
-                span.end();
-                let _ = get_tracer_provider().shutdown();
+                cx.span().add_event(
+                    "session.ended",
+                    vec![
+                        KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
+                        KeyValue::new("reason", "no_staged_changes"),
+                    ],
+                );
+                cx.span().end();
+                shutdown_tracing();
                 return Ok(());
             }
 
@@ -345,8 +431,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             if num_result.is_err() {
                 println!("\n{} Please enter a valid number (1-3)\n", "❌".red());
-                span.end();
-                let _ = get_tracer_provider().shutdown();
+                cx.span().add_event(
+                    "session.ended",
+                    vec![
+                        KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
+                        KeyValue::new("reason", "invalid_input"),
+                    ],
+                );
+                cx.span().end();
+                shutdown_tracing();
                 return Ok(());
             }
 
@@ -373,8 +466,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     if !status.success() {
                         println!("\nFailed to edit commit message using nano");
-                        span.end();
-                        let _ = get_tracer_provider().shutdown();
+                        cx.span().add_event(
+                            "session.ended",
+                            vec![
+                                KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
+                                KeyValue::new("reason", "editor_failed"),
+                            ],
+                        );
+                        cx.span().end();
+                        shutdown_tracing();
                         return Ok(());
                     }
 
@@ -387,8 +487,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => {
                     info!("FAILURE - User cancelled commit");
                     println!("\nCommit cancelled\n");
-                    span.end();
-                    let _ = get_tracer_provider().shutdown();
+                    cx.span().add_event(
+                        "session.ended",
+                        vec![
+                            KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
+                            KeyValue::new("reason", "user_cancelled"),
+                        ],
+                    );
+                    cx.span().end();
+                    shutdown_tracing();
                     return Ok(());
                 }
             };
@@ -400,8 +507,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
             }
 
-            span.end();
-            let _ = get_tracer_provider().shutdown();
+            cx.span().add_event(
+                "session.ended",
+                vec![
+                    KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
+                    KeyValue::new("success", true),
+                ],
+            );
+            cx.span().end();
+            shutdown_tracing();
             Ok(())
         }
     }

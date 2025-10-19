@@ -3,6 +3,12 @@ use crate::git::GitClient;
 use crate::tools::executor::ToolExecutor;
 use log::{info, warn};
 use openai_api_rs::v1::chat_completion::{ChatCompletionMessage, Content, MessageRole};
+use opentelemetry::global;
+use opentelemetry::trace::{Span, SpanKind, Status, TraceContextExt, Tracer};
+use opentelemetry::{Context, KeyValue};
+
+// OpenInference semantic conventions
+const OPENINFERENCE_SPAN_KIND_AGENT: &str = "AGENT";
 
 #[derive(Debug)]
 pub struct AgentError {
@@ -104,6 +110,31 @@ impl<'a> Agent<'a> {
     }
 
     pub async fn generate_commit_message(&mut self) -> Result<CommitMessageResult, AgentError> {
+        let tracer = global::tracer("iamcommitted");
+
+        // Create agent span as child of current context
+        let parent_cx = Context::current();
+        let mut agent_span = tracer
+            .span_builder("agent.generate_commit_message")
+            .with_kind(SpanKind::Internal)
+            .start_with_context(&tracer, &parent_cx);
+
+        // OpenInference semantic conventions
+        agent_span.set_attribute(KeyValue::new(
+            "openinference.span.kind",
+            OPENINFERENCE_SPAN_KIND_AGENT,
+        ));
+        agent_span.set_attribute(KeyValue::new(
+            "agent.max_iterations",
+            self.max_iterations as i64,
+        ));
+
+        // Attach span to context for nested operations
+        let agent_cx = parent_cx.with_span(agent_span);
+        let agent_cx_clone = agent_cx.clone();
+        let agent_span_ref = agent_cx_clone.span();
+        let _guard = agent_cx.attach();
+
         info!("Starting agent loop for commit message generation");
 
         let tool_executor = ToolExecutor::new(self.git_client);
@@ -151,11 +182,26 @@ impl<'a> Agent<'a> {
         // If no tool calls, return the response with token usage
         if response.tool_calls.is_none() {
             if let Some(content) = response.content {
+                agent_span_ref.set_attribute(KeyValue::new("agent.iterations_used", 0_i64));
+                agent_span_ref.set_attribute(KeyValue::new("agent.success", true));
+                agent_span_ref.set_attribute(KeyValue::new(
+                    "agent.token_usage.total",
+                    total_token_usage.total_tokens as i64,
+                ));
+                agent_span_ref.set_status(Status::Ok);
+                agent_span_ref.end();
                 return Ok(CommitMessageResult {
                     message: content,
                     token_usage: total_token_usage,
                 });
             }
+            agent_span_ref.set_attribute(KeyValue::new("agent.success", false));
+            agent_span_ref.set_attribute(KeyValue::new(
+                "agent.error",
+                "no_content_or_tool_calls",
+            ));
+            agent_span_ref.set_status(Status::error("No content or tool calls in response"));
+            agent_span_ref.end();
             return Err(AgentError {
                 message: "No content or tool calls in response".to_string(),
             });
@@ -166,6 +212,12 @@ impl<'a> Agent<'a> {
         while iteration < self.max_iterations {
             iteration += 1;
             info!("Agent iteration {}/{}", iteration, self.max_iterations);
+
+            // Add event for this iteration
+            agent_span_ref.add_event(
+                format!("agent.iteration.{}", iteration),
+                vec![KeyValue::new("iteration", iteration as i64)],
+            );
 
             // Get the tool calls from the last assistant message
             let tool_calls = match conversation_history.last() {
@@ -232,11 +284,23 @@ impl<'a> Agent<'a> {
             if response.tool_calls.is_none() {
                 if let Some(content) = response.content {
                     info!("Agent loop completed after {} iterations", iteration);
+                    agent_span_ref.set_attribute(KeyValue::new("agent.iterations_used", iteration as i64));
+                    agent_span_ref.set_attribute(KeyValue::new("agent.success", true));
+                    agent_span_ref.set_attribute(KeyValue::new(
+                        "agent.token_usage.total",
+                        total_token_usage.total_tokens as i64,
+                    ));
+                    agent_span_ref.set_status(Status::Ok);
+                    agent_span_ref.end();
                     return Ok(CommitMessageResult {
                         message: content,
                         token_usage: total_token_usage,
                     });
                 }
+                agent_span_ref.set_attribute(KeyValue::new("agent.success", false));
+                agent_span_ref.set_attribute(KeyValue::new("agent.error", "no_content_in_final_response"));
+                agent_span_ref.set_status(Status::error("No content in final response"));
+                agent_span_ref.end();
                 return Err(AgentError {
                     message: "No content in final response".to_string(),
                 });
@@ -247,6 +311,11 @@ impl<'a> Agent<'a> {
             "Agent loop reached max iterations ({})",
             self.max_iterations
         );
+        agent_span_ref.set_attribute(KeyValue::new("agent.iterations_used", iteration as i64));
+        agent_span_ref.set_attribute(KeyValue::new("agent.success", false));
+        agent_span_ref.set_attribute(KeyValue::new("agent.error", "max_iterations_exceeded"));
+        agent_span_ref.set_status(Status::error("Max iterations exceeded"));
+        agent_span_ref.end();
         Err(AgentError {
             message: format!(
                 "Agent loop exceeded maximum iterations ({})",
