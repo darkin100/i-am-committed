@@ -226,12 +226,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up logging with verbose flag if provided
     setup_logging(cli.verbose, &session_id)?;
 
+    // Get user ID from git config or system environment
+    let git_client_for_user = GitClient::new();
+    let user_id = git_client_for_user
+        .get_git_user()
+        .unwrap_or_else(|_| {
+            env::var("USER")
+                .or_else(|_| env::var("USERNAME"))
+                .unwrap_or_else(|_| "unknown".to_string())
+        });
+
     let mut span = tracer
         .span_builder(format!("session_{}", &session_id))
-        .with_kind(SpanKind::Client)
+        .with_kind(SpanKind::Server)
         .start(tracer);
 
+    // OpenInference semantic conventions - mark this as a CHAIN span
+    span.set_attribute(KeyValue::new("openinference.span.kind", "CHAIN"));
     span.set_attribute(KeyValue::new("session.id", session_id.clone()));
+    span.set_attribute(KeyValue::new("user.id", user_id.clone()));
     span.set_attribute(KeyValue::new("app.version", VERSION));
     span.set_attribute(KeyValue::new(
         "session.mode",
@@ -247,6 +260,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     info!("Session started with ID: {}", session_id);
+    info!("User ID: {}", user_id);
 
     // Create a context with this span as the active span and attach it
     let cx = Context::current_with_span(span);
@@ -255,6 +269,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli.verbose {
         println!("Verbose mode enabled. Logs will be printed to console.");
         println!("Session ID: {}", session_id);
+        println!("User ID: {}", user_id);
     }
 
     match cli.command {
@@ -305,6 +320,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match generate_formatted_commit_message(&git_client, &mut ai_client).await {
                 Ok(result) => {
                     fs::write(&commit_msg_file_path, &result.message)?;
+                    cx.span().set_attribute(KeyValue::new("user.decision", "auto_applied"));
                     info!(
                         "Successfully wrote AI-generated commit message to {}",
                         commit_msg_file_path
@@ -332,7 +348,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             cx.span().add_event(
                 "session.ended",
-                vec![KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339())],
+                vec![
+                    KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
+                    KeyValue::new("user.decision", "auto_applied"),
+                ],
             );
             cx.span().end();
             shutdown_tracing();
@@ -372,11 +391,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!(
                     "\n  Please stage your changes using 'git add' before running this command.\n"
                 );
+                cx.span().set_attribute(KeyValue::new("user.decision", "no_changes"));
                 cx.span().add_event(
                     "session.ended",
                     vec![
                         KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
                         KeyValue::new("reason", "no_staged_changes"),
+                        KeyValue::new("user.decision", "no_changes"),
                     ],
                 );
                 cx.span().end();
@@ -423,11 +444,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             if num_result.is_err() {
                 println!("\n{} Please enter a valid number (1-3)\n", "❌".red());
+                cx.span().set_attribute(KeyValue::new("user.decision", "invalid_input"));
                 cx.span().add_event(
                     "session.ended",
                     vec![
                         KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
                         KeyValue::new("reason", "invalid_input"),
+                        KeyValue::new("user.decision", "invalid_input"),
                     ],
                 );
                 cx.span().end();
@@ -439,10 +462,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let final_message = match num {
                 1 => {
                     info!("SUCCESS - User accepted AI-generated commit message");
+                    cx.span().set_attribute(KeyValue::new("user.decision", "accepted"));
                     result.message
                 }
                 2 => {
-                    info!("FAILURE - User chose to edit commit message manually");
+                    info!("User chose to edit commit message manually");
+                    cx.span().set_attribute(KeyValue::new("user.decision", "edited"));
                     // Edit commit message using nano
                     // Note: std::fs is already imported at the top level
                     use tempfile::NamedTempFile; // Keep this local as it's specific to this block
@@ -458,6 +483,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     if !status.success() {
                         println!("\nFailed to edit commit message using nano");
+                        cx.span().set_attribute(KeyValue::new("user.decision", "editor_failed"));
                         cx.span().add_event(
                             "session.ended",
                             vec![
@@ -477,13 +503,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     format!("{}", formatted_commit)
                 }
                 _ => {
-                    info!("FAILURE - User cancelled commit");
+                    info!("User cancelled commit");
+                    cx.span().set_attribute(KeyValue::new("user.decision", "cancelled"));
                     println!("\nCommit cancelled\n");
                     cx.span().add_event(
                         "session.ended",
                         vec![
                             KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
                             KeyValue::new("reason", "user_cancelled"),
+                            KeyValue::new("user.decision", "cancelled"),
                         ],
                     );
                     cx.span().end();
@@ -499,11 +527,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
             }
 
+            let decision_value = if num == 1 {
+                "accepted"
+            } else if num == 2 {
+                "edited"
+            } else {
+                "cancelled"
+            };
+
             cx.span().add_event(
                 "session.ended",
                 vec![
                     KeyValue::new("timestamp", chrono::Utc::now().to_rfc3339()),
                     KeyValue::new("success", true),
+                    KeyValue::new("user.decision", decision_value),
                 ],
             );
             cx.span().end();

@@ -1,7 +1,11 @@
 use colored::*;
-use log::info;
+use log::{info, warn};
 use std::process::Command;
 use std::process::Output;
+
+// Maximum size for git diff output in characters (~25,000 tokens)
+// This prevents context length errors when sending to OpenAI API
+const MAX_DIFF_SIZE: usize = 100_000;
 
 pub struct GitClient {
     working_dir: Option<String>,
@@ -39,8 +43,31 @@ impl GitClient {
     pub fn get_staged_changes(&self) -> Result<String, GitError> {
         info!("GitClient::get_staged_changes called");
         let output = self.run_git_command(&["diff", "--cached", "--diff-algorithm=minimal"])?;
-        let result = String::from_utf8_lossy(&output.stdout).to_string();
-        info!("GitClient::get_staged_changes completed:\n{}", result);
+        let diff = String::from_utf8_lossy(&output.stdout).to_string();
+
+        // Truncate if the diff is too large to prevent context length errors
+        let result = if diff.len() > MAX_DIFF_SIZE {
+            warn!(
+                "Diff size ({} chars) exceeds maximum ({} chars). Truncating to prevent API errors.",
+                diff.len(),
+                MAX_DIFF_SIZE
+            );
+            let truncated = diff.chars().take(MAX_DIFF_SIZE).collect::<String>();
+            format!(
+                "{}\n\n... [DIFF TRUNCATED: Total size was {} characters, showing first {} characters to stay within API limits. The changes are very large - consider committing smaller, focused changesets.] ...",
+                truncated,
+                diff.len(),
+                MAX_DIFF_SIZE
+            )
+        } else {
+            diff
+        };
+
+        info!(
+            "GitClient::get_staged_changes completed - returned {} chars (original: {} chars)",
+            result.len(),
+            String::from_utf8_lossy(&output.stdout).len()
+        );
         Ok(result)
     }
 
@@ -114,6 +141,39 @@ impl GitClient {
             "GitClient::get_current_branch completed - branch: {}",
             result
         );
+        Ok(result)
+    }
+
+    pub fn get_git_user(&self) -> Result<String, GitError> {
+        info!("GitClient::get_git_user called");
+
+        // Try to get user name
+        let name_output = self.run_git_command(&["config", "user.name"]);
+        let name = match name_output {
+            Ok(output) => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            Err(_) => String::new(),
+        };
+
+        // Try to get user email
+        let email_output = self.run_git_command(&["config", "user.email"]);
+        let email = match email_output {
+            Ok(output) => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            Err(_) => String::new(),
+        };
+
+        let result = if !name.is_empty() && !email.is_empty() {
+            format!("{} <{}>", name, email)
+        } else if !name.is_empty() {
+            name
+        } else if !email.is_empty() {
+            email
+        } else {
+            return Err(GitError {
+                message: "Could not determine git user".to_string(),
+            });
+        };
+
+        info!("GitClient::get_git_user completed - user: {}", result);
         Ok(result)
     }
 
@@ -196,10 +256,31 @@ impl GitClient {
         );
         let output =
             self.run_git_command(&["diff", "--cached", "--diff-algorithm=minimal", file_path])?;
-        let result = String::from_utf8_lossy(&output.stdout).to_string();
+        let diff = String::from_utf8_lossy(&output.stdout).to_string();
+
+        // Truncate if the diff is too large to prevent context length errors
+        let result = if diff.len() > MAX_DIFF_SIZE {
+            warn!(
+                "File diff for '{}' size ({} chars) exceeds maximum ({} chars). Truncating to prevent API errors.",
+                file_path,
+                diff.len(),
+                MAX_DIFF_SIZE
+            );
+            let truncated = diff.chars().take(MAX_DIFF_SIZE).collect::<String>();
+            format!(
+                "{}\n\n... [DIFF TRUNCATED: Total size was {} characters, showing first {} characters to stay within API limits. This file has very large changes.] ...",
+                truncated,
+                diff.len(),
+                MAX_DIFF_SIZE
+            )
+        } else {
+            diff
+        };
+
         info!(
-            "GitClient::get_file_diff completed - diff length: {} chars",
-            result.len()
+            "GitClient::get_file_diff completed - returned {} chars (original: {} chars)",
+            result.len(),
+            String::from_utf8_lossy(&output.stdout).len()
         );
         Ok(result)
     }

@@ -200,3 +200,4 @@ A span that represents calls to a component to protect against jailbreak user in
 #### Evaluator
 
 A span that represents a call to a function/proccess performing an evaluation of the language model's outputs. Examples include assessing the relevance, correctness, or helpfulness of the language model's answers.
+ 
