@@ -114,6 +114,30 @@ impl AIClient {
         &self.model
     }
 
+    /// Simple chat completion without tools for evaluation purposes
+    pub async fn simple_chat_completion(
+        &mut self,
+        messages: Vec<ChatCompletionMessage>,
+    ) -> Result<String, AIError> {
+        let req = ChatCompletionRequest::new(self.model.clone(), messages);
+
+        let result = self.client.chat_completion(req).await.map_err(|e| {
+            AIError {
+                message: format!("OpenAI API error: {}", e),
+            }
+        })?;
+
+        let content = result.choices[0]
+            .message
+            .content
+            .clone()
+            .ok_or_else(|| AIError {
+                message: "No content in response".to_string(),
+            })?;
+
+        Ok(content)
+    }
+
     pub async fn generate_commit_message_with_tools(
         &mut self,
         mut conversation_history: Vec<ChatCompletionMessage>,
