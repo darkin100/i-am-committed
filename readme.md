@@ -1,5 +1,12 @@
 # I Am Committed
 
+> [!NOTE] This branch contains a refactoring of `I am Committed` that utilises a more agentic message generation loop as part of the Webinar https://www.youtube.com/watch?v=qTI9Se97Lpk
+> Specifically this branch includes a more robust evaluation strategy and a telemetry system dependant on [Phoneix](https://phoenix.arize.com/).
+> To run locally follow the standard instructions below plus setting up *Phoenix* but you will also be required to run.
+>
+>  docker run -p 6006:6006 -p 4317:4317 -i -t arizephoenix/phoenix:latest
+> https://arize.com/docs/phoenix/self-hosting/deployment-options/docker
+
 ## An AI micro bot for generating Git Commits
 
 This project is an experimentation into AI. Specifically, I am looking to understand AI tools better to answer two questions:
