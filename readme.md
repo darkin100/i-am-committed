@@ -6,7 +6,7 @@
 > To run locally follow the standard instructions below plus setting up *Phoenix* but you will also be required to run.
 >
 > ```bash
-> docker run -p 6006:6006 -p 4317:4317 -i -t arizephoenix/phoenix:latest
+> docker compose up
 > ```
 >
 > https://arize.com/docs/phoenix/self-hosting/deployment-options/docker
